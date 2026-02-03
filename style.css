@@ -1,0 +1,27 @@
+/* Animación suave para modales */
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+/* Tipografías */
+.font-modern { font-family: 'Inter', sans-serif !important; }
+.font-serif { font-family: 'Playfair Display', serif !important; }
+.font-mono { font-family: 'Roboto Mono', monospace !important; }
+
+/* Mobile Optimization */
+* {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+input { user-select: auto; }
+
+@media print {
+    .no-print, nav, button { display: none !important; }
+    body { background: white; }
+    main { width: 100%; padding: 0; }
+}
