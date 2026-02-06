@@ -25,13 +25,15 @@ app.get('/', (req, res) => {
     else res.status(404).send("No se encontró el archivo index.html en la raíz ni en /public");
 });
 
-// Ruta explícita para el manifest (ayuda a algunos generadores de APK)
+// Ruta explícita para el manifest con cabecera de contenido correcta
 app.get('/manifest.json', (req, res) => {
+    res.header("Content-Type", "application/manifest+json");
     res.sendFile(path.join(__dirname, 'manifest.json'));
 });
 
-// Ruta explícita para el Service Worker
+// Ruta explícita para el Service Worker con cabecera de contenido correcta
 app.get('/sw.js', (req, res) => {
+    res.header("Content-Type", "application/javascript");
     res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
