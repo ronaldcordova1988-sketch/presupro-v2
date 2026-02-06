@@ -5,7 +5,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
-// Servir archivos desde la raíz y desde public para evitar errores de ruta
+
+// Servir archivos estáticos de forma prioritaria
+// Esto asegura que manifest.json, sw.js y los iconos sean visibles
 app.use(express.static(__dirname));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -21,6 +23,16 @@ app.get('/', (req, res) => {
     if (fs.existsSync(rootPath)) res.sendFile(rootPath);
     else if (fs.existsSync(publicPath)) res.sendFile(publicPath);
     else res.status(404).send("No se encontró el archivo index.html en la raíz ni en /public");
+});
+
+// Ruta explícita para el manifest (ayuda a algunos generadores de APK)
+app.get('/manifest.json', (req, res) => {
+    res.sendFile(path.join(__dirname, 'manifest.json'));
+});
+
+// Ruta explícita para el Service Worker
+app.get('/sw.js', (req, res) => {
+    res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
 function generarHTMLPresupuesto(datos) {
@@ -69,7 +81,7 @@ function generarHTMLPresupuesto(datos) {
                 .logo { max-width: 180px; max-height: 90px; object-fit: contain; }
                 .empresa-info { text-align: right; }
                 h1 { margin: 0; color: #1e40af; font-size: 24px; text-transform: uppercase; font-weight: 900; }
-                .cliente-box { background: #f8fafc; padding: 20px; border-radius: 15px; margin-bottom: 30px; border: 1px solid #e2e8f0; display: grid; grid-template-cols: 1fr 1fr; }
+                .cliente-box { background: #f8fafc; padding: 20px; border-radius: 15px; margin-bottom: 30px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; }
                 table { width: 100%; border-collapse: collapse; margin-top: 10px; }
                 th { background-color: #334155; color: white; padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
                 td { border-bottom: 1px solid #e2e8f0; padding: 12px; font-size: 13px; }
