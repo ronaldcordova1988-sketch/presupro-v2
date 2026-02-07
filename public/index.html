@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>PresuPro APK</title>
     
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -38,6 +38,11 @@
         ::-webkit-scrollbar {
             display: none;
         }
+        /* Mejora visual para botones deshabilitados */
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 overflow-x-hidden antialiased">
@@ -56,19 +61,19 @@
                 <h2 class="text-2xl font-black text-slate-800 uppercase italic leading-none">Acceso<br><span class="text-blue-600">Restringido</span></h2>
                 <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">Ingresa tus credenciales</p>
             </div>
-            <div class="space-y-4">
+            <form onsubmit="event.preventDefault(); handleLogin();" class="space-y-4">
                 <div>
                     <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Correo Electrónico</label>
-                    <input type="email" id="auth-email" class="w-full p-4 bg-slate-100 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm">
+                    <input type="email" id="auth-email" required class="w-full p-4 bg-slate-100 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm">
                 </div>
                 <div>
                     <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Contraseña</label>
-                    <input type="password" id="auth-pass" class="w-full p-4 bg-slate-100 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm">
+                    <input type="password" id="auth-pass" required class="w-full p-4 bg-slate-100 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm">
                 </div>
-                <button onclick="handleLogin()" id="btn-login" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm shadow-lg active:scale-95 transition-all">
+                <button type="submit" id="btn-login" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm shadow-lg active:scale-95 transition-all">
                     Entrar al Sistema
                 </button>
-            </div>
+            </form>
             <p class="text-center text-[9px] text-slate-400 mt-6 uppercase font-bold tracking-tighter">Software Protegido por Licencia PresuPro</p>
         </div>
     </div>
@@ -158,7 +163,7 @@
                     <button onclick="enviarAlServidor()" class="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
                         <span>📥</span> PDF
                     </button>
-                    <button onclick="guardarFacturaFirebase()" class="py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                    <button id="btn-save-invoice" onclick="guardarFacturaFirebase()" class="py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
                         <span>💾</span> GUARDAR
                     </button>
                 </div>
@@ -195,7 +200,7 @@
                     <input type="number" id="inv-qty" placeholder="Stock" class="w-1/2 p-2 rounded-lg text-xs outline-none">
                     <input type="number" id="inv-price" placeholder="Precio $" class="w-1/2 p-2 rounded-lg text-xs outline-none">
                 </div>
-                <button onclick="addToInventory()" class="w-full bg-slate-800 text-white text-[10px] font-bold py-2 rounded-lg uppercase">+ Guardar</button>
+                <button id="btn-add-inv" onclick="addToInventory()" class="w-full bg-slate-800 text-white text-[10px] font-bold py-2 rounded-lg uppercase">+ Guardar</button>
             </div>
             <div id="inventory-list" class="flex-1 overflow-y-auto space-y-2"></div>
         </div>
@@ -221,7 +226,7 @@
                 <input type="text" id="in-comp-name" placeholder="Nombre Empresa" class="w-full p-4 bg-slate-50 rounded-2xl border font-black uppercase text-center">
                 <button onclick="document.getElementById('logo-input').click()" class="w-full py-3 border-2 border-dashed rounded-2xl font-bold text-slate-400 text-[10px]">CAMBIAR LOGO</button>
                 <input type="file" id="logo-input" class="hidden" onchange="previewLogo(this)">
-                <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase">Guardar Cambios</button>
+                <button id="btn-save-settings" onclick="saveSettings()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase">Guardar Cambios</button>
                 <hr class="my-2">
                 <button onclick="handleLogout()" class="w-full bg-red-100 text-red-600 font-black py-4 rounded-2xl uppercase text-[10px]">Cerrar Sesión</button>
             </div>
@@ -272,6 +277,8 @@
                 authScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
                 if (window.renderInventory) window.renderInventory();
+                // Mejora: cargar ajustes al iniciar sesión
+                if (window.loadSettings) window.loadSettings();
             } else {
                 window.currentUser = null;
                 authScreen.classList.remove('hidden');
@@ -283,10 +290,10 @@
     <script src="app.js"></script>
 
     <script>
-        // Registro del Service Worker para funcionamiento offline
+        // Registro del Service Worker corregido para evitar errores en el instalador de Android (Ruta ./ absoluta)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                navigator.serviceWorker.register('sw.js', { scope: './' })
                     .then(reg => console.log('Service Worker registrado correctamente'))
                     .catch(err => console.error('Error al registrar Service Worker:', err));
             });
@@ -306,9 +313,19 @@
             try {
                 await window.signIn(window.auth, email, pass);
             } catch (error) {
-                alert("Error de acceso: " + error.message);
+                let msg = "Error de acceso";
+                if(error.code === 'auth/wrong-password') msg = "Contraseña incorrecta";
+                if(error.code === 'auth/user-not-found') msg = "Usuario no registrado";
+                alert(msg + ": " + error.message);
                 btn.innerText = "Entrar al Sistema";
                 btn.disabled = false;
+            }
+        }
+
+        // Manejador para el cierre de sesión con confirmación
+        function handleLogout() {
+            if(confirm("¿Estás seguro de que deseas cerrar sesión?")) {
+                window.logout(window.auth);
             }
         }
     </script>
