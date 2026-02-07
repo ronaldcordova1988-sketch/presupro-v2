@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PresuPro APK</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&family=Playfair+Display:wght@700&family=Roboto+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -214,18 +221,15 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
-        // Persistencia Offline
         enableIndexedDbPersistence(db).catch((err) => {
             console.log("Persistencia falló o ya está activa");
         });
 
-        // Globales para app.js
         window.db = db;
         window.auth = auth;
         window.signIn = signInWithEmailAndPassword;
         window.logout = signOut;
 
-        // Listener de Autenticación
         onAuthStateChanged(auth, (user) => {
             const authScreen = document.getElementById('auth-screen');
             const mainApp = document.getElementById('main-app');
@@ -233,7 +237,6 @@
                 window.currentUser = user.uid;
                 authScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
-                // Al loguearse, cargar datos
                 if (window.renderInventory) window.renderInventory();
             } else {
                 window.currentUser = null;
@@ -243,5 +246,15 @@
         });
     </script>
     <script src="app.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registrado correctamente'))
+                    .catch(err => console.error('Error al registrar Service Worker', err));
+            });
+        }
+    </script>
 </body>
 </html>
