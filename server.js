@@ -6,6 +6,14 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// --- MEJORA DE CABECERAS DE SEGURIDAD PARA PWA ---
+// Esto ayuda a que el navegador confíe en los scripts de Firebase y el Service Worker
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    next();
+});
+
 // Servir archivos estáticos de forma prioritaria
 // Esto asegura que manifest.json, sw.js y los iconos sean visibles
 app.use(express.static(__dirname));
@@ -25,6 +33,8 @@ app.get('/', (req, res) => {
     else res.status(404).send("No se encontró el archivo index.html en la raíz ni en /public");
 });
 
+// --- RUTAS EXPLÍCITAS OPTIMIZADAS PARA PWABUILDER ---
+
 // Ruta explícita para el manifest con cabecera de contenido correcta
 app.get('/manifest.json', (req, res) => {
     res.header("Content-Type", "application/manifest+json");
@@ -34,6 +44,7 @@ app.get('/manifest.json', (req, res) => {
 // Ruta explícita para el Service Worker con cabecera de contenido correcta
 app.get('/sw.js', (req, res) => {
     res.header("Content-Type", "application/javascript");
+    res.header("Service-Worker-Allowed", "/"); // Permite que el SW controle toda la app
     res.sendFile(path.join(__dirname, 'sw.js'));
 });
 

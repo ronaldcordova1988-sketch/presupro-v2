@@ -14,6 +14,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&family=Playfair+Display:wght@700&family=Roboto+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+        input, textarea {
+            user-select: text;
+        }
+        /* Animación suave para modales */
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-900 overflow-x-hidden antialiased">
 
@@ -209,12 +228,12 @@
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = {
-          apiKey: "AIzaSyBTfukrycpMrtYZ6vuF06knIxi4-g8TLLs",
-          authDomain: "presuproapp.firebaseapp.com",
-          projectId: "presuproapp",
-          storageBucket: "presuproapp.firebasestorage.app",
-          messagingSenderId: "56089233501",
-          appId: "1:56089233501:web:363348f4daf2b6bb9825b4"
+            apiKey: "AIzaSyBTfukrycpMrtYZ6vuF06knIxi4-g8TLLs",
+            authDomain: "presuproapp.firebaseapp.com",
+            projectId: "presuproapp",
+            storageBucket: "presuproapp.firebasestorage.app",
+            messagingSenderId: "56089233501",
+            appId: "1:56089233501:web:363348f4daf2b6bb9825b4"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -245,14 +264,15 @@
             }
         });
     </script>
+    
     <script src="app.js"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('Service Worker registrado correctamente'))
-                    .catch(err => console.error('Error al registrar Service Worker', err));
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(reg => console.log('Service Worker registrado correctamente. Scope:', reg.scope))
+                    .catch(err => console.error('Error al registrar Service Worker:', err));
             });
         }
     </script>
