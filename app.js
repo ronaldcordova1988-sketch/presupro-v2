@@ -1,12 +1,29 @@
+// app.js
 // --- CONFIGURACIÓN DE RUTAS ---
-// IMPORTANTE: Sustituye 'tu-app-en-render.onrender.com' por tu URL real de Render
+// RECUERDA: En local, antes de iniciar: taskkill /F /IM node.exe
+// URL configurada para tu app en Render
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? '' 
-    : 'https://tu-app-en-render.onrender.com'; 
+    : 'https://presupro-v2.onrender.com'; 
+
+// --- SISTEMA ANTI-SLEEP (KEEP ALIVE) ---
+function startAntiSleep() {
+    console.log("Bot Anti-Sleep activado...");
+    setInterval(async () => {
+        try {
+            await fetch(`${API_URL}/ping`); 
+            console.log("Ping enviado para mantener servidor activo");
+        } catch (e) {
+            console.log("Error en keep-alive, posiblemente servidor reiniciando");
+        }
+    }, 300000); // Cada 5 minutos
+}
 
 // --- CONFIGURACIÓN INICIAL ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Quitar splash screen con transición suave
+    startAntiSleep();
+
+    // Splash screen
     setTimeout(() => {
         const splash = document.getElementById('splash');
         if (splash) {
@@ -15,28 +32,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 2000);
     
-    // Poner fecha actual
+    // Fecha actual
     const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('display-date').innerText = new Date().toLocaleDateString('es-ES', opciones);
+    const dateEl = document.getElementById('display-date');
+    if (dateEl) dateEl.innerText = new Date().toLocaleDateString('es-ES', opciones);
 
-    // Cargar ajustes guardados localmente (Nombre de empresa y Logo)
+    // Cargar ajustes guardados (Nombre de empresa y Logo)
     const savedCompName = localStorage.getItem('presupro_comp_name');
     const savedLogo = localStorage.getItem('presupro_comp_logo');
     
     if (savedCompName) {
-        document.getElementById('display-company').innerText = savedCompName;
-        document.getElementById('in-comp-name').value = savedCompName;
+        const displayComp = document.getElementById('display-company');
+        const inComp = document.getElementById('in-comp-name');
+        if (displayComp) displayComp.innerText = savedCompName;
+        if (inComp) inComp.value = savedCompName;
     }
     if (savedLogo) {
         const img = document.getElementById('logo-img');
-        img.src = savedLogo;
-        img.classList.remove('hidden');
-        document.getElementById('logo-txt').classList.add('hidden');
+        const txt = document.getElementById('logo-txt');
+        if (img) {
+            img.src = savedLogo;
+            img.classList.remove('hidden');
+        }
+        if (txt) txt.classList.add('hidden');
     }
 });
 
 // --- SISTEMA DE AUTENTICACIÓN ---
-async function handleLogin() {
+window.handleLogin = async function() {
     const email = document.getElementById('auth-email').value;
     const pass = document.getElementById('auth-pass').value;
     const btn = document.getElementById('btn-login');
@@ -58,31 +81,33 @@ async function handleLogin() {
     }
 }
 
-async function handleLogout() {
+window.handleLogout = async function() {
     if (confirm("¿Cerrar sesión?")) {
         await window.logout(window.auth);
-        localStorage.clear(); // Limpia caché local al salir
+        localStorage.clear();
         location.reload();
     }
 }
 
 // --- FUNCIONES DE NAVEGACIÓN Y MODALES ---
-function openModal(id) {
+window.openModal = function(id) {
     const modal = document.getElementById(id);
+    if (!modal) return;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     if(id === 'modalInventory') renderInventory();
     if(id === 'modalHistory') renderHistory();
 }
 
-function closeModal(id) {
+window.closeModal = function(id) {
     const modal = document.getElementById(id);
+    if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
 }
 
 // --- GESTIÓN DE INVENTARIO FIREBASE (MULTIUSUARIO) ---
-async function addToInventory() {
+window.addToInventory = async function() {
     if (!window.currentUser) return;
     
     const name = document.getElementById('inv-name').value.toUpperCase().trim();
@@ -143,7 +168,7 @@ async function renderInventory() {
     }
 }
 
-async function selectFromInventory(nombre) {
+window.selectFromInventory = async function(nombre) {
     if (!window.currentUser) return;
     const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
     const docRef = doc(window.db, "usuarios", window.currentUser, "inventario", nombre);
@@ -170,13 +195,7 @@ async function descontarInventario() {
                 const docRef = doc(window.db, "usuarios", window.currentUser, "inventario", nombre);
                 try {
                     const docSnap = await getDoc(docRef);
-                    if (docSnap.exists() && docSnap.data().cantidad >= cant) {
-                        await updateDoc(docRef, {
-                            cantidad: increment(-cant)
-                        });
-                    } else {
-                        console.warn(`Stock insuficiente para: ${nombre}`);
-                        alert(`Aviso: Stock insuficiente para ${nombre}. Se procesará de todos modos.`);
+                    if (docSnap.exists()) {
                         await updateDoc(docRef, {
                             cantidad: increment(-cant)
                         });
@@ -190,15 +209,16 @@ async function descontarInventario() {
 }
 
 // --- GESTIÓN DE MATERIALES ---
-function addItemRow(tipo = 'externo', data = null) {
+window.addItemRow = function(tipo = 'externo', data = null) {
     const container = document.getElementById('items-container');
+    if (!container) return;
     const div = document.createElement('div');
     
     const isStock = (tipo === 'stock');
     const borderColor = isStock ? "border-blue-200 bg-blue-50/20" : "border-slate-100 bg-white";
     const badge = isStock ? "📦 MI TIENDA" : "🛒 COMPRA FUERA";
 
-    div.className = `material-row ${borderColor} p-4 rounded-2xl shadow-sm border flex gap-3 items-center animate-slide-up`;
+    div.className = `material-row ${borderColor} p-4 rounded-2xl shadow-sm border flex gap-3 items-center animate-slide-up mb-3`;
     div.dataset.tipo = tipo; 
     
     div.innerHTML = `
@@ -226,7 +246,7 @@ function addItemRow(tipo = 'externo', data = null) {
 }
 
 // --- LÓGICA DE CÁLCULO ---
-function calcTotal() {
+window.calcTotal = function() {
     let totalMateriales = 0;
     const filas = document.querySelectorAll('.material-row');
     filas.forEach(fila => {
@@ -242,18 +262,24 @@ function calcTotal() {
     const totalGeneral = totalMateriales + totalMO;
     const tasa = parseFloat(document.getElementById('tasa-cambio').value) || 1;
 
-    document.getElementById('total-amount').innerText = `$ ${totalGeneral.toFixed(2)}`;
-    document.getElementById('total-converted').innerText = `BS ${(totalGeneral * tasa).toFixed(2)}`;
-    return { totalGeneral, totalMO, totalMateriales };
+    const totalAmtEl = document.getElementById('total-amount');
+    const totalConvEl = document.getElementById('total-converted');
+    
+    if (totalAmtEl) totalAmtEl.innerText = `$ ${totalGeneral.toFixed(2)}`;
+    if (totalConvEl) totalConvEl.innerText = `BS ${(totalGeneral * tasa).toFixed(2)}`;
+    
+    return { totalGeneral, totalMO, totalMateriales, tasa };
 }
 
 // --- GUARDAR Y EDITAR FACTURAS (MULTIUSUARIO) ---
-async function guardarFacturaFirebase() {
+window.guardarFacturaFirebase = async function() {
     if (!window.currentUser) return;
     
     const btn = document.querySelector('button[onclick="guardarFacturaFirebase()"]');
-    btn.disabled = true;
-    btn.innerText = "GUARDANDO...";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "GUARDANDO...";
+    }
 
     const listaMateriales = [];
     document.querySelectorAll('.material-row').forEach(fila => {
@@ -282,14 +308,17 @@ async function guardarFacturaFirebase() {
     } catch (e) {
         alert("Error al guardar factura");
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = "<span>💾</span> GUARDAR";
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = "<span>💾</span> GUARDAR";
+        }
     }
 }
 
 async function renderHistory() {
     if (!window.currentUser) return;
     const list = document.getElementById('history-list');
+    if (!list) return;
     try {
         const { collection, getDocs, query, orderBy } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
         const q = query(collection(window.db, "usuarios", window.currentUser, "facturas"), orderBy("fecha", "desc"));
@@ -300,57 +329,78 @@ async function renderHistory() {
             const f = docSnap.data();
             const d = new Date(f.fecha).toLocaleDateString();
             list.innerHTML += `
-                <div class="bg-slate-50 p-4 rounded-2xl border mb-2">
-                    <p class="text-[10px] font-bold text-blue-600">${d}</p>
-                    <p class="font-black text-xs uppercase">${f.cliente}</p>
-                    <p class="text-xs text-slate-500">${f.total}</p>
-                    <button onclick="cargarFactura('${docSnap.id}')" class="mt-2 bg-slate-800 text-white text-[9px] px-2 py-1 rounded">EDITAR / CARGAR</button>
+                <div class="bg-slate-50 p-4 rounded-2xl border mb-2 flex justify-between items-start">
+                    <div class="flex-1">
+                        <p class="text-[10px] font-bold text-blue-600">${d}</p>
+                        <p class="font-black text-xs uppercase">${f.cliente}</p>
+                        <p class="text-xs text-slate-500">${f.total}</p>
+                        <div class="flex gap-2 mt-2">
+                             <button onclick="cargarFactura('${docSnap.id}')" class="bg-slate-800 text-white text-[9px] px-2 py-1 rounded">EDITAR</button>
+                             <button onclick="borrarFactura('${docSnap.id}')" class="bg-red-500 text-white text-[9px] px-2 py-1 rounded">BORRAR</button>
+                        </div>
+                    </div>
                 </div>
             `;
         });
     } catch (e) { console.error(e); }
 }
 
-async function cargarFactura(id) {
+window.borrarFactura = async function(id) {
+    if (!confirm("¿Seguro que deseas eliminar esta factura?")) return;
+    if (!window.currentUser) return;
+    
+    try {
+        const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+        await deleteDoc(doc(window.db, "usuarios", window.currentUser, "facturas", id));
+        alert("Factura eliminada");
+        renderHistory();
+    } catch (e) {
+        alert("No se pudo eliminar");
+    }
+}
+
+window.cargarFactura = async function(id) {
     if (!window.currentUser) return;
     const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
     const snap = await getDoc(doc(window.db, "usuarios", window.currentUser, "facturas", id));
     if (snap.exists()) {
         const f = snap.data();
-        nuevaFactura(false); 
+        window.nuevaFactura(false); 
         document.getElementById('display-client-name').innerText = f.cliente;
         document.getElementById('in-client-id').value = f.clienteId;
         document.getElementById('mo-m2').value = f.m2;
         document.getElementById('mo-price').value = f.precioMO;
         f.materiales.forEach(m => {
-            addItemRow(m.tipo, { nombre: m.nombre, precio: m.precio });
+            window.addItemRow(m.tipo, { nombre: m.nombre, precio: m.precio });
             const filas = document.querySelectorAll('#items-container .material-row');
             const ultimaFila = filas[filas.length - 1];
             ultimaFila.querySelector('.cantidad-material').value = m.cantidad;
         });
-        calcTotal();
-        closeModal('modalHistory');
+        window.calcTotal();
+        window.closeModal('modalHistory');
     }
 }
 
-function nuevaFactura(preguntar = true) {
+window.nuevaFactura = function(preguntar = true) {
     if (preguntar && !confirm("¿Limpiar todo para una nueva factura?")) return;
-    document.getElementById('items-container').innerHTML = "";
+    const container = document.getElementById('items-container');
+    if (container) container.innerHTML = "";
     document.getElementById('mo-m2').value = "";
     document.getElementById('mo-price').value = "";
     document.getElementById('in-client-name').value = "";
     document.getElementById('in-client-id').value = "";
     document.getElementById('display-client-name').innerText = "Tocar para añadir datos";
-    calcTotal();
+    window.calcTotal();
 }
 
 // --- ENVÍO AL SERVIDOR ---
-async function enviarAlServidor() {
+window.enviarAlServidor = async function() {
     const btn = document.querySelector('button[onclick="enviarAlServidor()"]');
-    btn.disabled = true;
-    btn.innerText = "GENERANDO...";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "GENERANDO...";
+    }
 
-    // Descontar inventario antes de generar PDF
     await descontarInventario();
 
     const listaMateriales = [];
@@ -363,7 +413,7 @@ async function enviarAlServidor() {
         });
     });
 
-    const totales = calcTotal();
+    const totales = window.calcTotal();
 
     const datos = {
         cliente: {
@@ -381,11 +431,10 @@ async function enviarAlServidor() {
             totalMO: totales.totalMO
         },
         totalGeneral: totales.totalGeneral,
-        tasa: document.getElementById('tasa-cambio').value || 1
+        tasa: totales.tasa
     };
 
     try {
-        // MEJORA: Usamos la constante API_URL para soportar Render/Local
         const response = await fetch(`${API_URL}/generar-presupuesto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -398,47 +447,63 @@ async function enviarAlServidor() {
             win.document.write(html);
             win.document.close();
         } else {
-            alert("Error al conectar con el servidor. Inténtalo de nuevo.");
+            alert("Error al conectar con el servidor.");
         }
     } catch (error) {
-        alert("Error de conexión. Verifica que el servidor en Render esté activo (puede tardar 1 min en despertar).");
+        alert("Error de conexión. Verifica el servidor en Render.");
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = "<span>📥</span> PDF";
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = "<span>📥</span> PDF";
+        }
     }
 }
 
 // --- PERSONALIZACIÓN ---
-function saveClientData() {
+window.saveClientData = function() {
     const nombre = document.getElementById('in-client-name').value;
+    const id = document.getElementById('in-client-id').value;
     if(nombre) {
         document.getElementById('display-client-name').innerText = nombre.toUpperCase();
-        closeModal('modalClient');
     }
+    window.closeModal('modalClient');
 }
 
-function saveSettings() {
+window.saveSettings = function() {
     const name = document.getElementById('in-comp-name').value;
     if(name) {
         const upperName = name.toUpperCase();
         document.getElementById('display-company').innerText = upperName;
         localStorage.setItem('presupro_comp_name', upperName);
     }
-    closeModal('modalSettings');
+    window.closeModal('modalSettings');
 }
 
-function previewLogo(input) {
+window.previewLogo = function(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = document.getElementById('logo-img');
+            const txt = document.getElementById('logo-txt');
             const base64Logo = e.target.result;
-            img.src = base64Logo;
-            img.classList.remove('hidden');
-            document.getElementById('logo-txt').classList.add('hidden');
-            // Guardar logo en persistencia local
+            if (img) {
+                img.src = base64Logo;
+                img.classList.remove('hidden');
+            }
+            if (txt) txt.classList.add('hidden');
             localStorage.setItem('presupro_comp_logo', base64Logo);
         }
         reader.readAsDataURL(input.files[0]);
     }
+}
+
+// --- REGISTRO DE SERVICE WORKER ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                console.log('SW registrado con éxito:', registration.scope);
+            })
+            .catch(err => console.error('Fallo al registrar SW:', err));
+    });
 }

@@ -18,10 +18,24 @@
     -webkit-tap-highlight-color: transparent;
     user-select: none;
 }
-input { user-select: auto; }
+
+/* Permitir selección en inputs para facilitar edición */
+input, textarea { 
+    user-select: auto; 
+}
+
+/* Mejora: Transiciones suaves para botones */
+button {
+    transition: all 0.2s ease;
+}
 
 @media print {
     .no-print, nav, button { display: none !important; }
     body { background: white; }
     main { width: 100%; padding: 0; }
+}
+
+/* Ocultar scrollbar pero mantener funcionalidad */
+::-webkit-scrollbar {
+    display: none;
 }

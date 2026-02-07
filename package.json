@@ -1,5 +1,24 @@
 {
+  "name": "sistema-presupuestos-construccion",
+  "version": "1.0.0",
+  "description": "Sistema de gestión de presupuestos con PWA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
   "dependencies": {
-    "express": "^5.2.1"
-  }
+    "express": "^5.2.1",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "pwa",
+    "presupuestos",
+    "render"
+  ],
+  "author": "PresuPro",
+  "license": "ISC"
 }

@@ -1,10 +1,12 @@
-const CACHE_NAME = 'presupro-v2'; // Incrementamos versión para forzar actualización
+const CACHE_NAME = 'presupro-v4'; // MEJORA: Incrementamos a v4 para forzar actualización en Render/APK
 const urlsToCache = [
     '/',
     '/index.html',
     '/style.css',
     '/app.js',
     '/manifest.json',
+    '/icon-192.png',
+    '/icon-512.png',
     'https://cdn.tailwindcss.com',
     'https://fonts.googleapis.com/css2?family=Inter:wght@400;900&family=Playfair+Display:wght@700&family=Roboto+Mono&display=swap'
 ];
@@ -13,8 +15,8 @@ const urlsToCache = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('Caché abierto correctamente');
-            // Usamos cache.addAll pero con un catch para evitar que un solo archivo rompa la instalación
+            console.log('Caché v4 abierto correctamente');
+            // MEJORA: Intentamos cachear todo, pero no bloqueamos si uno falla
             return cache.addAll(urlsToCache).catch(err => console.warn('Fallo al cachear algunos recursos:', err));
         })
     );
@@ -40,19 +42,22 @@ self.addEventListener('activate', (event) => {
 });
 
 // Estrategia: Network First con fallback a Caché
-// Optimizada para manejar errores de red y asegurar disponibilidad offline
 self.addEventListener('fetch', (event) => {
     // Solo manejar peticiones GET
     if (event.request.method !== 'GET') return;
 
-    // Evitar cachear llamadas externas de Firebase o analíticas si las tuvieras
+    // Evitar cachear llamadas externas de Firebase o analíticas
     if (event.request.url.includes('firestore.googleapis.com')) return;
+    
+    // MEJORA: Evitar peticiones de extensiones de navegador (chrome-extension://) que rompen el caché
+    if (!event.request.url.startsWith('http')) return;
 
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                // Si la respuesta es válida, la clonamos y la guardamos en el caché (Opcional: Actualización dinámica)
-                if (response && response.status === 200 && response.type === 'basic') {
+                // MEJORA: Si la respuesta es buena, guardamos una copia en el caché
+                // Quitamos la restricción de 'basic' para permitir que se guarde Tailwind y Google Fonts
+                if (response && response.status === 200 && response.type !== 'opaque') {
                     const responseToCache = response.clone();
                     caches.open(CACHE_NAME).then((cache) => {
                         cache.put(event.request, responseToCache);
@@ -65,9 +70,14 @@ self.addEventListener('fetch', (event) => {
                 return caches.match(event.request).then((res) => {
                     if (res) return res;
                     
-                    // Si no está en caché y es una navegación (página), mostrar index.html
-                    if (event.request.mode === 'navigate') {
+                    // Si es una navegación (página principal), devolvemos el root cacheado
+                    if (event.request.mode === 'navigate' || (event.request.method === 'GET' && event.request.headers.get('accept').includes('text/html'))) {
                         return caches.match('/');
+                    }
+
+                    // MEJORA: Fallback para imágenes fallidas en offline
+                    if (event.request.destination === 'image') {
+                        return caches.match('/icon-192.png');
                     }
                 });
             })
