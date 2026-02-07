@@ -1,10 +1,10 @@
 // --- CONFIGURACIÓN INICIAL ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Quitar splash screen
+    // Quitar splash screen con transición suave
     setTimeout(() => {
         const splash = document.getElementById('splash');
         if (splash) {
-            splash.classList.add('opacity-0');
+            splash.style.opacity = '0';
             setTimeout(() => splash.remove(), 500);
         }
     }, 2000);
@@ -13,7 +13,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
     document.getElementById('display-date').innerText = new Date().toLocaleDateString('es-ES', opciones);
 
-    // El inventario se carga automáticamente vía onAuthStateChanged en el index.html
+    // Cargar ajustes guardados localmente (Nombre de empresa y Logo)
+    const savedCompName = localStorage.getItem('presupro_comp_name');
+    const savedLogo = localStorage.getItem('presupro_comp_logo');
+    
+    if (savedCompName) {
+        document.getElementById('display-company').innerText = savedCompName;
+        document.getElementById('in-comp-name').value = savedCompName;
+    }
+    if (savedLogo) {
+        const img = document.getElementById('logo-img');
+        img.src = savedLogo;
+        img.classList.remove('hidden');
+        document.getElementById('logo-txt').classList.add('hidden');
+    }
 });
 
 // --- SISTEMA DE AUTENTICACIÓN ---
@@ -39,23 +52,24 @@ async function handleLogin() {
 async function handleLogout() {
     if (confirm("¿Cerrar sesión?")) {
         await window.logout(window.auth);
+        localStorage.clear(); // Limpia caché local al salir
         location.reload();
     }
 }
 
 // --- FUNCIONES DE NAVEGACIÓN Y MODALES ---
-function showView(view) {
-    // Lógica para cambiar entre vistas si fuera necesario
-}
-
 function openModal(id) {
-    document.getElementById(id).classList.remove('hidden');
+    const modal = document.getElementById(id);
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
     if(id === 'modalInventory') renderInventory();
     if(id === 'modalHistory') renderHistory();
 }
 
 function closeModal(id) {
-    document.getElementById(id).classList.add('hidden');
+    const modal = document.getElementById(id);
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 }
 
 // --- GESTIÓN DE INVENTARIO FIREBASE (MULTIUSUARIO) ---
@@ -70,7 +84,6 @@ async function addToInventory() {
 
     try {
         const { doc, setDoc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-        // Ruta: usuarios/ID_USER/inventario/NOMBRE_PRODUCTO
         const docRef = doc(window.db, "usuarios", window.currentUser, "inventario", name);
         const docSnap = await getDoc(docRef);
 
@@ -213,12 +226,17 @@ function calcTotal() {
 
     document.getElementById('total-amount').innerText = `$ ${totalGeneral.toFixed(2)}`;
     document.getElementById('total-converted').innerText = `BS ${(totalGeneral * tasa).toFixed(2)}`;
+    return { totalGeneral, totalMO, totalMateriales };
 }
 
 // --- GUARDAR Y EDITAR FACTURAS (MULTIUSUARIO) ---
 async function guardarFacturaFirebase() {
     if (!window.currentUser) return;
     
+    const btn = document.querySelector('button[onclick="guardarFacturaFirebase()"]');
+    btn.disabled = true;
+    btn.innerText = "GUARDANDO...";
+
     const listaMateriales = [];
     document.querySelectorAll('.material-row').forEach(fila => {
         listaMateriales.push({
@@ -245,6 +263,9 @@ async function guardarFacturaFirebase() {
         alert("Factura guardada en tu historial");
     } catch (e) {
         alert("Error al guardar factura");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = "<span>💾</span> GUARDAR";
     }
 }
 
@@ -285,7 +306,8 @@ async function cargarFactura(id) {
         document.getElementById('mo-price').value = f.precioMO;
         f.materiales.forEach(m => {
             addItemRow(m.tipo, { nombre: m.nombre, precio: m.precio });
-            const ultimaFila = document.querySelector('#items-container .material-row:last-child');
+            const filas = document.querySelectorAll('#items-container .material-row');
+            const ultimaFila = filas[filas.length - 1];
             ultimaFila.querySelector('.cantidad-material').value = m.cantidad;
         });
         calcTotal();
@@ -306,6 +328,10 @@ function nuevaFactura(preguntar = true) {
 
 // --- ENVÍO AL SERVIDOR ---
 async function enviarAlServidor() {
+    const btn = document.querySelector('button[onclick="enviarAlServidor()"]');
+    btn.disabled = true;
+    btn.innerText = "GENERANDO...";
+
     // Descontar inventario antes de generar PDF
     await descontarInventario();
 
@@ -314,9 +340,12 @@ async function enviarAlServidor() {
         listaMateriales.push({
             nombre: fila.querySelector('.nombre-material').value || "Producto",
             cantidad: fila.querySelector('.cantidad-material').value || 0,
-            precio: fila.querySelector('.precio-material').value || 0
+            precio: fila.querySelector('.precio-material').value || 0,
+            subtotal: (parseFloat(fila.querySelector('.cantidad-material').value) || 0) * (parseFloat(fila.querySelector('.precio-material').value) || 0)
         });
     });
+
+    const totales = calcTotal();
 
     const datos = {
         cliente: {
@@ -330,8 +359,11 @@ async function enviarAlServidor() {
         materiales: listaMateriales,
         manoObra: {
             metros: document.getElementById('mo-m2').value || 0,
-            precioPorMetro: document.getElementById('mo-price').value || 0
-        }
+            precioPorMetro: document.getElementById('mo-price').value || 0,
+            totalMO: totales.totalMO
+        },
+        totalGeneral: totales.totalGeneral,
+        tasa: document.getElementById('tasa-cambio').value
     };
 
     try {
@@ -350,7 +382,10 @@ async function enviarAlServidor() {
             alert("Error al conectar con el servidor.");
         }
     } catch (error) {
-        alert("Asegúrate de que el servidor en Render esté activo.");
+        alert("Error de conexión. Verifica que el servidor esté activo.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = "<span>📥</span> PDF";
     }
 }
 
@@ -366,7 +401,9 @@ function saveClientData() {
 function saveSettings() {
     const name = document.getElementById('in-comp-name').value;
     if(name) {
-        document.getElementById('display-company').innerText = name.toUpperCase();
+        const upperName = name.toUpperCase();
+        document.getElementById('display-company').innerText = upperName;
+        localStorage.setItem('presupro_comp_name', upperName);
     }
     closeModal('modalSettings');
 }
@@ -376,9 +413,12 @@ function previewLogo(input) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = document.getElementById('logo-img');
-            img.src = e.target.result;
+            const base64Logo = e.target.result;
+            img.src = base64Logo;
             img.classList.remove('hidden');
             document.getElementById('logo-txt').classList.add('hidden');
+            // Guardar logo en persistencia local
+            localStorage.setItem('presupro_comp_logo', base64Logo);
         }
         reader.readAsDataURL(input.files[0]);
     }
