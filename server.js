@@ -4,7 +4,9 @@ const fs = require('fs');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json());
+// MEJORA: Aumentamos el límite de recepción para que el servidor acepte la imagen del Logo
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // --- MEJORA DE CABECERAS DE SEGURIDAD PARA PWA ---
 // Esto ayuda a que el navegador confíe en los scripts de Firebase y el Service Worker

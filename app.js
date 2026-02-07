@@ -1,3 +1,9 @@
+// --- CONFIGURACIÓN DE RUTAS ---
+// IMPORTANTE: Sustituye 'tu-app-en-render.onrender.com' por tu URL real de Render
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? '' 
+    : 'https://tu-app-en-render.onrender.com'; 
+
 // --- CONFIGURACIÓN INICIAL ---
 document.addEventListener('DOMContentLoaded', () => {
     // Quitar splash screen con transición suave
@@ -43,7 +49,10 @@ async function handleLogin() {
     try {
         await window.signIn(window.auth, email, pass);
     } catch (error) {
-        alert("Error de acceso: Credenciales incorrectas");
+        console.error("Error de Firebase:", error.code);
+        let msg = "Error de acceso: Credenciales incorrectas";
+        if (error.code === 'auth/network-request-failed') msg = "Sin conexión a internet";
+        alert(msg);
         btn.innerText = "Entrar al Sistema";
         btn.disabled = false;
     }
@@ -150,7 +159,7 @@ async function selectFromInventory(nombre) {
 // --- DESCUENTO DE STOCK AUTOMÁTICO ---
 async function descontarInventario() {
     if (!window.currentUser) return;
-    const { doc, updateDoc, increment } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+    const { doc, updateDoc, increment, getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
     const filas = document.querySelectorAll('.material-row');
     
     for (let fila of filas) {
@@ -160,9 +169,18 @@ async function descontarInventario() {
             if (cant > 0) {
                 const docRef = doc(window.db, "usuarios", window.currentUser, "inventario", nombre);
                 try {
-                    await updateDoc(docRef, {
-                        cantidad: increment(-cant)
-                    });
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists() && docSnap.data().cantidad >= cant) {
+                        await updateDoc(docRef, {
+                            cantidad: increment(-cant)
+                        });
+                    } else {
+                        console.warn(`Stock insuficiente para: ${nombre}`);
+                        alert(`Aviso: Stock insuficiente para ${nombre}. Se procesará de todos modos.`);
+                        await updateDoc(docRef, {
+                            cantidad: increment(-cant)
+                        });
+                    }
                 } catch (e) {
                     console.error("No se pudo descontar stock de:", nombre);
                 }
@@ -363,11 +381,12 @@ async function enviarAlServidor() {
             totalMO: totales.totalMO
         },
         totalGeneral: totales.totalGeneral,
-        tasa: document.getElementById('tasa-cambio').value
+        tasa: document.getElementById('tasa-cambio').value || 1
     };
 
     try {
-        const response = await fetch('/generar-presupuesto', {
+        // MEJORA: Usamos la constante API_URL para soportar Render/Local
+        const response = await fetch(`${API_URL}/generar-presupuesto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(datos)
@@ -379,10 +398,10 @@ async function enviarAlServidor() {
             win.document.write(html);
             win.document.close();
         } else {
-            alert("Error al conectar con el servidor.");
+            alert("Error al conectar con el servidor. Inténtalo de nuevo.");
         }
     } catch (error) {
-        alert("Error de conexión. Verifica que el servidor esté activo.");
+        alert("Error de conexión. Verifica que el servidor en Render esté activo (puede tardar 1 min en despertar).");
     } finally {
         btn.disabled = false;
         btn.innerHTML = "<span>📥</span> PDF";
