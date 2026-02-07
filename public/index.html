@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>PresuPro APK</title>
     
     <link rel="manifest" href="/manifest.json">
@@ -20,6 +20,8 @@
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
             user-select: none;
+            /* Evita el scroll elástico en iOS y asegura que ocupe toda la pantalla */
+            overscroll-behavior-y: contain;
         }
         input, textarea {
             user-select: text;
@@ -31,6 +33,10 @@
         @keyframes slideUp {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
+        }
+        /* Ocultar barra de scroll pero mantener funcionalidad */
+        ::-webkit-scrollbar {
+            display: none;
         }
     </style>
 </head>
@@ -240,6 +246,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
+        // Persistencia para que funcione sin internet (clave para APK)
         enableIndexedDbPersistence(db).catch((err) => {
             console.log("Persistencia falló o ya está activa");
         });
@@ -252,6 +259,14 @@
         onAuthStateChanged(auth, (user) => {
             const authScreen = document.getElementById('auth-screen');
             const mainApp = document.getElementById('main-app');
+            const splash = document.getElementById('splash');
+
+            // Quitar splash screen tras una pequeña espera para ver el logo
+            setTimeout(() => {
+                if (splash) splash.style.opacity = '0';
+                setTimeout(() => splash ? splash.remove() : null, 500);
+            }, 1500);
+
             if (user) {
                 window.currentUser = user.uid;
                 authScreen.classList.add('hidden');
@@ -268,12 +283,33 @@
     <script src="app.js"></script>
 
     <script>
+        // Registro del Service Worker para funcionamiento offline
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js', { scope: '/' })
-                    .then(reg => console.log('Service Worker registrado correctamente. Scope:', reg.scope))
+                    .then(reg => console.log('Service Worker registrado correctamente'))
                     .catch(err => console.error('Error al registrar Service Worker:', err));
             });
+        }
+
+        // Función global para manejar el login desde el botón
+        async function handleLogin() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            const btn = document.getElementById('btn-login');
+            
+            if(!email || !pass) return alert("Por favor rellena los campos");
+            
+            btn.innerText = "Cargando...";
+            btn.disabled = true;
+            
+            try {
+                await window.signIn(window.auth, email, pass);
+            } catch (error) {
+                alert("Error de acceso: " + error.message);
+                btn.innerText = "Entrar al Sistema";
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
