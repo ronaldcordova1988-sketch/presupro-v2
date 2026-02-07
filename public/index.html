@@ -3,30 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>PresuPro APK</title>
+    <title>PresuPro v2</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&family=Playfair+Display:wght@700&family=Roboto+Mono&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
     
     <style>
         body {
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
             user-select: none;
-            /* Evita el scroll elástico en iOS y asegura que ocupe toda la pantalla */
             overscroll-behavior-y: contain;
         }
         input, textarea {
             user-select: text;
         }
-        /* Animación suave para modales */
         .animate-slide-up {
             animation: slideUp 0.3s ease-out;
         }
@@ -34,14 +31,16 @@
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
         }
-        /* Ocultar barra de scroll pero mantener funcionalidad */
         ::-webkit-scrollbar {
             display: none;
         }
-        /* Mejora visual para botones deshabilitados */
         button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
+        }
+        /* Estilo para impresión básica */
+        @media print {
+            .no-print { display: none !important; }
         }
     </style>
 </head>
@@ -79,7 +78,7 @@
     </div>
 
     <div id="main-app" class="hidden">
-        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center h-16 z-50 no-print">
+        <nav class="fixed bottom-0 shrink-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center h-16 z-50 no-print">
             <button onclick="nuevaFactura()" class="flex flex-col items-center text-blue-600">
                 <span class="text-xl">📝</span>
                 <span class="text-[10px] font-bold uppercase">Nueva</span>
@@ -103,7 +102,7 @@
                 <div class="flex items-center gap-4">
                     <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden border">
                         <img id="logo-img" src="" class="hidden w-full h-full object-contain">
-                        <span id="logo-txt" class="text-[10px] font-bold text-slate-400">LOGO</span>
+                        <span id="logo-txt" class="text-[10px] font-bold text-slate-400 text-center px-1">LOGO</span>
                     </div>
                     <div>
                         <h2 id="display-company" class="text-xl font-black uppercase leading-none text-blue-600">Mi Empresa</h2>
@@ -115,14 +114,15 @@
             <button onclick="openModal('modalClient')" class="w-full bg-white border-2 border-dashed border-slate-200 p-4 rounded-2xl mb-6 flex justify-between items-center active:scale-95 transition-transform">
                 <div class="text-left">
                     <p class="text-[10px] font-bold text-slate-400 uppercase">Cliente:</p>
-                    <p id="display-client-name" class="font-bold text-slate-700 uppercase italic">Tocar para añadir datos</p>
+                    <p id="display-client-name" class="font-bold text-slate-700 uppercase italic text-sm">Añadir datos del cliente</p>
                     <p id="display-client-id-text" class="text-[9px] text-slate-400 uppercase"></p>
                 </div>
                 <span class="text-blue-500 text-xl">👤</span>
             </button>
 
             <h3 class="text-[10px] font-black text-slate-400 uppercase mb-3 ml-2">Lista de Materiales</h3>
-            <div id="items-container" class="space-y-3"></div>
+            <div id="items-container" class="space-y-3">
+                </div>
 
             <div class="grid grid-cols-2 gap-3 mt-4">
                 <button onclick="addItemRow('externo')" class="py-4 bg-white border-2 border-slate-300 border-dashed rounded-2xl text-slate-600 font-bold text-[10px] uppercase hover:bg-slate-50 active:scale-95 transition-all flex flex-col items-center gap-1">
@@ -138,11 +138,11 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-[9px] font-bold text-slate-400 ml-1">METROS CUADRADOS (m2)</label>
-                        <input type="number" id="mo-m2" oninput="calcTotal()" placeholder="0" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="mo-m2" oninput="saveAndCalc()" placeholder="0" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="text-[9px] font-bold text-slate-400 ml-1">PRECIO POR m2 ($)</label>
-                        <input type="number" id="mo-price" oninput="calcTotal()" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="mo-price" oninput="saveAndCalc()" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
             </div>
@@ -155,12 +155,12 @@
                     </div>
                     <div class="text-right">
                         <p class="text-[10px] font-bold text-blue-400 uppercase">Tasa del día</p>
-                        <input type="number" id="tasa-cambio" value="60" oninput="calcTotal()" class="bg-transparent text-right font-black text-xl w-20 outline-none border-b border-blue-500/30">
+                        <input type="number" id="tasa-cambio" value="60" oninput="saveAndCalc()" class="bg-transparent text-right font-black text-xl w-20 outline-none border-b border-blue-500/30">
                     </div>
                 </div>
                 
                 <div class="grid grid-cols-2 gap-2 mb-4">
-                    <button onclick="enviarAlServidor()" class="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                    <button id="btn-generate-pdf" onclick="enviarAlServidor()" class="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
                         <span>📥</span> PDF
                     </button>
                     <button id="btn-save-invoice" onclick="guardarFacturaFirebase()" class="py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
@@ -173,6 +173,11 @@
                     <span id="total-converted" class="text-xl font-black text-blue-400">BS 0.00</span>
                 </div>
             </div>
+
+            <footer class="mt-12 text-center pb-10">
+                <p class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">PresuPro v2.0</p>
+                <p class="text-[9px] font-bold text-blue-400/50 uppercase">Conexión con Servidor Render Activa</p>
+            </footer>
         </main>
     </div>
 
@@ -184,6 +189,7 @@
                 <input type="text" id="in-client-name" placeholder="Nombre Completo" class="w-full p-4 bg-slate-50 rounded-2xl outline-none border font-bold text-sm">
                 <input type="text" id="in-client-dir" placeholder="Dirección" class="w-full p-4 bg-slate-50 rounded-2xl outline-none border font-bold text-sm">
                 <button onclick="saveClientData()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm mt-2">Listo</button>
+                <button onclick="closeModal('modalClient')" class="w-full text-slate-400 font-bold text-[10px] uppercase">Cancelar</button>
             </div>
         </div>
     </div>
@@ -200,7 +206,7 @@
                     <input type="number" id="inv-qty" placeholder="Stock" class="w-1/2 p-2 rounded-lg text-xs outline-none">
                     <input type="number" id="inv-price" placeholder="Precio $" class="w-1/2 p-2 rounded-lg text-xs outline-none">
                 </div>
-                <button id="btn-add-inv" onclick="addToInventory()" class="w-full bg-slate-800 text-white text-[10px] font-bold py-2 rounded-lg uppercase">+ Guardar</button>
+                <button id="btn-add-inv" onclick="addToInventory()" class="w-full bg-slate-800 text-white text-[10px] font-bold py-2 rounded-lg uppercase">+ Guardar en Stock</button>
             </div>
             <div id="inventory-list" class="flex-1 overflow-y-auto space-y-2"></div>
         </div>
@@ -209,26 +215,28 @@
     <div id="modalHistory" class="fixed inset-0 bg-black/60 z-[60] hidden flex items-end sm:items-center justify-center p-4">
         <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[80vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="font-black uppercase">Historial Facturas</h3>
+                <h3 class="font-black uppercase">Historial de Facturas</h3>
                 <button onclick="closeModal('modalHistory')" class="text-2xl">&times;</button>
             </div>
-            <div id="history-list" class="flex-1 overflow-y-auto space-y-2"></div>
+            <div id="history-list" class="flex-1 overflow-y-auto space-y-3"></div>
         </div>
     </div>
 
     <div id="modalSettings" class="fixed inset-0 bg-black/60 z-[60] hidden flex items-end sm:items-center justify-center p-4">
-        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="font-black uppercase">Configuración</h3>
-                <button onclick="closeModal('modalSettings')" class="text-2xl">&times;</button>
-            </div>
+        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up">
+            <h3 class="font-black uppercase mb-4">Configuración</h3>
             <div class="space-y-4">
-                <input type="text" id="in-comp-name" placeholder="Nombre Empresa" class="w-full p-4 bg-slate-50 rounded-2xl border font-black uppercase text-center">
-                <button onclick="document.getElementById('logo-input').click()" class="w-full py-3 border-2 border-dashed rounded-2xl font-bold text-slate-400 text-[10px]">CAMBIAR LOGO</button>
-                <input type="file" id="logo-input" class="hidden" onchange="previewLogo(this)">
-                <button id="btn-save-settings" onclick="saveSettings()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase">Guardar Cambios</button>
-                <hr class="my-2">
-                <button onclick="handleLogout()" class="w-full bg-red-100 text-red-600 font-black py-4 rounded-2xl uppercase text-[10px]">Cerrar Sesión</button>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre de Empresa</label>
+                    <input type="text" id="in-comp-name" class="w-full p-4 bg-slate-50 rounded-2xl outline-none border font-bold text-sm">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Logo de Empresa</label>
+                    <input type="file" id="in-comp-logo" onchange="previewLogo(this)" class="w-full text-xs mt-1" accept="image/*">
+                </div>
+                <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm">Guardar Cambios</button>
+                <button onclick="handleLogout()" class="w-full bg-red-50 text-red-600 font-black py-4 rounded-2xl uppercase text-sm mt-4">Cerrar Sesión</button>
+                <button onclick="closeModal('modalSettings')" class="w-full text-slate-400 font-bold text-[10px] uppercase">Cerrar</button>
             </div>
         </div>
     </div>
@@ -251,10 +259,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
-        // Persistencia para que funcione sin internet (clave para APK)
-        enableIndexedDbPersistence(db).catch((err) => {
-            console.log("Persistencia falló o ya está activa");
-        });
+        enableIndexedDbPersistence(db).catch(() => console.log("Persistencia ya habilitada"));
 
         window.db = db;
         window.auth = auth;
@@ -266,19 +271,20 @@
             const mainApp = document.getElementById('main-app');
             const splash = document.getElementById('splash');
 
-            // Quitar splash screen tras una pequeña espera para ver el logo
             setTimeout(() => {
                 if (splash) splash.style.opacity = '0';
-                setTimeout(() => splash ? splash.remove() : null, 500);
+                setTimeout(() => splash?.remove(), 500);
             }, 1500);
 
             if (user) {
                 window.currentUser = user.uid;
                 authScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
-                if (window.renderInventory) window.renderInventory();
-                // Mejora: cargar ajustes al iniciar sesión
-                if (window.loadSettings) window.loadSettings();
+                document.getElementById('display-date').innerText = new Date().toLocaleDateString();
+                
+                if(window.loadSettings) window.loadSettings();
+                if(window.loadInventory) window.loadInventory();
+                if(window.loadDraft) window.loadDraft(); // Carga borrador al iniciar
             } else {
                 window.currentUser = null;
                 authScreen.classList.remove('hidden');
@@ -286,47 +292,178 @@
             }
         });
     </script>
-    
+
     <script src="app.js"></script>
 
     <script>
-        // Registro del Service Worker corregido para evitar errores en el instalador de Android (Ruta ./ absoluta)
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js', { scope: './' })
-                    .then(reg => console.log('Service Worker registrado correctamente'))
-                    .catch(err => console.error('Error al registrar Service Worker:', err));
-            });
+        const API_URL = 'https://presupro-v2.onrender.com';
+
+        // SISTEMA KEEP-ALIVE (Mejora para Render)
+        function keepAlive() {
+            if (API_URL) {
+                fetch(`${API_URL}/ping`)
+                    .then(() => console.log('Keep-alive: Servidor despierto'))
+                    .catch(() => console.log('Keep-alive: Servidor iniciando...'));
+            }
+        }
+        setInterval(keepAlive, 300000); // Ping cada 5 minutos
+
+        function openModal(id) { 
+            const modal = document.getElementById(id);
+            if(modal) modal.classList.remove('hidden'); 
+        }
+        function closeModal(id) { 
+            const modal = document.getElementById(id);
+            if(modal) modal.classList.add('hidden'); 
         }
 
-        // Función global para manejar el login desde el botón
+        // Mejora: Sistema de persistencia local (Draft)
+        function saveAndCalc() {
+            calcTotal();
+            const draft = {
+                m2: document.getElementById('mo-m2').value,
+                moPrice: document.getElementById('mo-price').value,
+                tasa: document.getElementById('tasa-cambio').value,
+                cliente: {
+                    name: document.getElementById('display-client-name').innerText,
+                    id: document.getElementById('in-client-id').value,
+                    dir: document.getElementById('in-client-dir').value
+                }
+            };
+            localStorage.setItem('presupro_draft', JSON.stringify(draft));
+        }
+
+        window.loadDraft = function() {
+            const saved = localStorage.getItem('presupro_draft');
+            if(saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('mo-m2').value = data.m2 || '';
+                document.getElementById('mo-price').value = data.moPrice || '';
+                document.getElementById('tasa-cambio').value = data.tasa || '60';
+                if(data.cliente) {
+                    document.getElementById('display-client-name').innerText = data.cliente.name;
+                    document.getElementById('in-client-id').value = data.cliente.id;
+                    document.getElementById('in-client-dir').value = data.cliente.dir;
+                }
+                calcTotal();
+            }
+        };
+
+        function calcTotal() {
+            let totalMat = 0;
+            document.querySelectorAll('.subtotal-item').forEach(el => {
+                const val = parseFloat(el.innerText.replace('$ ', '').replace(',', '.')) || 0;
+                totalMat += val;
+            });
+            
+            const m2 = parseFloat(document.getElementById('mo-m2').value) || 0;
+            const p2 = parseFloat(document.getElementById('mo-price').value) || 0;
+            const totalMO = m2 * p2;
+            const tasa = parseFloat(document.getElementById('tasa-cambio').value) || 1;
+            
+            const totalG = totalMat + totalMO;
+            document.getElementById('total-amount').innerText = `$ ${totalG.toFixed(2)}`;
+            document.getElementById('total-converted').innerText = `BS ${(totalG * tasa).toFixed(2)}`;
+            
+            return { totalGeneral: totalG, totalMO: totalMO, tasa: tasa };
+        }
+
+        async function enviarAlServidor() {
+            const btn = document.getElementById('btn-generate-pdf');
+            const originalText = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerText = "PROCESANDO...";
+
+            const materiales = [];
+            document.querySelectorAll('.material-row').forEach(row => {
+                const nombre = row.querySelector('.nombre-material').value;
+                if(nombre) {
+                    materiales.push({
+                        nombre: nombre,
+                        cantidad: row.querySelector('.cantidad-material').value,
+                        precio: row.querySelector('.precio-material').value,
+                        subtotal: parseFloat(row.querySelector('.subtotal-item').innerText.replace('$ ','').replace(',','.'))
+                    });
+                }
+            });
+
+            const totales = calcTotal();
+            const payload = {
+                cliente: {
+                    nombre: document.getElementById('display-client-name').innerText,
+                    id: document.getElementById('in-client-id').value,
+                    direccion: document.getElementById('in-client-dir').value
+                },
+                empresa: {
+                    nombre: document.getElementById('display-company').innerText,
+                    logo: document.getElementById('logo-img').src
+                },
+                materiales: materiales,
+                manoObra: {
+                    metros: document.getElementById('mo-m2').value,
+                    precioPorMetro: document.getElementById('mo-price').value,
+                    totalMO: totales.totalMO
+                },
+                totalGeneral: totales.totalGeneral,
+                tasa: totales.tasa
+            };
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+                const res = await fetch(`${API_URL}/generar-presupuesto`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if(!res.ok) throw new Error("Fallo en servidor");
+
+                const html = await res.text();
+                const win = window.open('', '_blank');
+                win.document.write(html);
+                win.document.close();
+            } catch (e) {
+                alert("Error: Render está despertando o la conexión es lenta. Reintenta en 10 segundos.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
         async function handleLogin() {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
             const btn = document.getElementById('btn-login');
             
-            if(!email || !pass) return alert("Por favor rellena los campos");
-            
-            btn.innerText = "Cargando...";
             btn.disabled = true;
+            btn.innerText = "AUTENTICANDO...";
             
             try {
                 await window.signIn(window.auth, email, pass);
-            } catch (error) {
-                let msg = "Error de acceso";
-                if(error.code === 'auth/wrong-password') msg = "Contraseña incorrecta";
-                if(error.code === 'auth/user-not-found') msg = "Usuario no registrado";
-                alert(msg + ": " + error.message);
-                btn.innerText = "Entrar al Sistema";
+            } catch (e) { 
+                alert("Acceso denegado. Verifica correo y contraseña."); 
                 btn.disabled = false;
+                btn.innerText = "ENTRAR AL SISTEMA";
             }
         }
 
-        // Manejador para el cierre de sesión con confirmación
-        function handleLogout() {
-            if(confirm("¿Estás seguro de que deseas cerrar sesión?")) {
+        function handleLogout() { 
+            if(confirm("¿Seguro que deseas cerrar la sesión?")) {
+                localStorage.removeItem('presupro_draft'); // Limpia borrador al salir
                 window.logout(window.auth);
             }
+        }
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("SW Activo v4"))
+                .catch(err => console.log("Error SW:", err));
         }
     </script>
 </body>
