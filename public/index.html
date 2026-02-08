@@ -296,12 +296,12 @@
     <script src="app.js"></script>
 
     <script>
-        const API_URL = 'https://presupro-v2.onrender.com';
+        // Eliminada la declaración redundante de API_URL ya que se encuentra en app.js
 
         // SISTEMA KEEP-ALIVE (Mejora para Render)
         function keepAlive() {
-            if (API_URL) {
-                fetch(`${API_URL}/ping`)
+            if (window.API_URL) {
+                fetch(`${window.API_URL}/ping`)
                     .then(() => console.log('Keep-alive: Servidor despierto'))
                     .catch(() => console.log('Keep-alive: Servidor iniciando...'));
             }
@@ -413,7 +413,7 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-                const res = await fetch(`${API_URL}/generar-presupuesto`, {
+                const res = await fetch(`${window.API_URL}/generar-presupuesto`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
