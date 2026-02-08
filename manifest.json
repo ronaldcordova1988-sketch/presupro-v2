@@ -34,29 +34,28 @@
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "Escritorio de PresuPro"
+      "form_factor": "narrow",
+      "label": "Vista móvil de PresuPro"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Vista móvil de PresuPro"
+      "form_factor": "wide",
+      "label": "Vista de escritorio de PresuPro"
     }
   ],
-  "start_url": "/",
+  "start_url": "./index.html",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "minimal-ui"],
   "orientation": "portrait",
   "theme_color": "#2563eb",
   "background_color": "#f1f5f9",
-  "categories": ["business", "productivity", "utilities"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "lang": "es-ES",
   "dir": "ltr",
-  "prefer_related_applications": false,
-  "launch_handler": {
-    "client_mode": "navigate-existing"
-  }
+  "prefer_related_applications": false
 }

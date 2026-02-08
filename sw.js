@@ -17,7 +17,12 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME).then((cache) => {
             console.log('Caché v4 abierto correctamente');
             // MEJORA: Intentamos cachear todo, pero no bloqueamos si uno falla
-            return cache.addAll(urlsToCache).catch(err => console.warn('Fallo al cachear algunos recursos:', err));
+            // Usamos un mapeo para intentar cachear cada recurso individualmente
+            return Promise.all(
+                urlsToCache.map(url => {
+                    return cache.add(url).catch(err => console.warn(`Fallo al cachear: ${url}`, err));
+                })
+            );
         })
     );
     // Fuerza al SW a activarse inmediatamente
@@ -47,7 +52,9 @@ self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
 
     // Evitar cachear llamadas externas de Firebase o analíticas
-    if (event.request.url.includes('firestore.googleapis.com')) return;
+    if (event.request.url.includes('firestore.googleapis.com') || 
+        event.request.url.includes('firebaseio.com') || 
+        event.request.url.includes('googleapis.com/identitytoolkit')) return;
     
     // MEJORA: Evitar peticiones de extensiones de navegador (chrome-extension://) que rompen el caché
     if (!event.request.url.startsWith('http')) return;
@@ -56,8 +63,8 @@ self.addEventListener('fetch', (event) => {
         fetch(event.request)
             .then((response) => {
                 // MEJORA: Si la respuesta es buena, guardamos una copia en el caché
-                // Quitamos la restricción de 'basic' para permitir que se guarde Tailwind y Google Fonts
-                if (response && response.status === 200 && response.type !== 'opaque') {
+                // Las respuestas de CDNs (Tailwind/Fonts) pueden ser 'opaque', las manejamos con cuidado
+                if (response && response.status === 200) {
                     const responseToCache = response.clone();
                     caches.open(CACHE_NAME).then((cache) => {
                         cache.put(event.request, responseToCache);
@@ -71,7 +78,8 @@ self.addEventListener('fetch', (event) => {
                     if (res) return res;
                     
                     // Si es una navegación (página principal), devolvemos el root cacheado
-                    if (event.request.mode === 'navigate' || (event.request.method === 'GET' && event.request.headers.get('accept').includes('text/html'))) {
+                    if (event.request.mode === 'navigate' || 
+                       (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
                         return caches.match('/');
                     }
 
