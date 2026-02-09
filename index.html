@@ -8,6 +8,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon-192.png">
     
@@ -241,7 +242,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, enableIndexedDbPersistence, collection, addDoc, getDocs, query, where, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, enableIndexedDbPersistence, collection, addDoc, getDocs, query, where, doc, setDoc, deleteDoc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -262,45 +263,33 @@
         window.db = db;
         window.auth = auth;
 
-        // --- FUNCIONES GLOBALES (ACCESIBLES DESDE EL HTML) ---
+        window.currentEditingInvoiceId = null;
 
         window.handleLogin = async () => {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
             const btn = document.getElementById('btn-login');
-            
             btn.disabled = true;
             btn.innerText = "Verificando...";
-            
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) {
+            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) {
                 alert("Error de acceso: Credenciales inválidas");
                 btn.disabled = false;
                 btn.innerText = "Entrar al Sistema";
             }
         };
 
-        window.handleLogout = () => {
-            if(confirm("¿Cerrar sesión?")) signOut(auth);
-        };
+        window.handleLogout = () => { if(confirm("¿Cerrar sesión?")) signOut(auth); };
 
         window.saveSettings = async () => {
             const nombre = document.getElementById('in-comp-name').value;
             const logo = document.getElementById('logo-img').src;
-            
             try {
-                // Guardamos en un documento único por usuario
                 await setDoc(doc(db, "settings", window.currentUser), {
-                    userId: window.currentUser,
-                    nombre: nombre,
-                    logo: logo
+                    userId: window.currentUser, nombre: nombre, logo: logo
                 });
                 alert("Configuración guardada");
                 location.reload();
-            } catch (e) {
-                alert("Error al guardar ajustes");
-            }
+            } catch (e) { alert("Error al guardar ajustes"); }
         };
 
         window.previewLogo = (input) => {
@@ -320,18 +309,15 @@
             const authScreen = document.getElementById('auth-screen');
             const mainApp = document.getElementById('main-app');
             const splash = document.getElementById('splash');
-
             setTimeout(() => {
                 if (splash) splash.style.opacity = '0';
                 setTimeout(() => splash?.remove(), 500);
             }, 1500);
-
             if (user) {
                 window.currentUser = user.uid;
                 authScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
                 document.getElementById('display-date').innerText = new Date().toLocaleDateString();
-                
                 loadSettings();
                 loadInventory();
                 loadHistory(); 
@@ -348,27 +334,50 @@
             const querySnapshot = await getDocs(q);
             const list = document.getElementById('inventory-list');
             list.innerHTML = '';
-            querySnapshot.forEach((doc) => {
-                const item = doc.data();
+            querySnapshot.forEach((docSnap) => {
+                const item = docSnap.data();
+                const id = docSnap.id;
                 list.innerHTML += `
                     <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center">
                         <div>
                             <p class="font-bold text-xs uppercase">${item.name}</p>
                             <p class="text-[10px] text-slate-400">STOCK: ${item.qty} | $${item.price}</p>
                         </div>
-                        <button onclick="addFromInventory('${item.name}', ${item.price})" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold uppercase">Añadir</button>
+                        <div class="flex gap-2">
+                            <button onclick="reponerStock('${id}', '${item.name}')" class="bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase" title="Reponer Stock">📦+</button>
+                            <button onclick="addFromInventory('${id}', '${item.name}', ${item.price}, ${item.qty})" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold uppercase">Añadir</button>
+                            <button onclick="deleteInventoryItem('${id}')" class="text-red-500 text-sm">✕</button>
+                        </div>
                     </div>
                 `;
             });
         }
         window.loadInventory = loadInventory;
 
+        window.deleteInventoryItem = async (id) => {
+            if(confirm("¿Eliminar del inventario?")) {
+                await deleteDoc(doc(db, "inventory", id));
+                loadInventory();
+            }
+        };
+
+        window.reponerStock = async (invId, name) => {
+            const extra = prompt(`¿Cuántas unidades de ${name} deseas añadir al stock?`, "0");
+            if(!extra || isNaN(extra) || Number(extra) <= 0) return;
+            try {
+                await updateDoc(doc(db, "inventory", invId), {
+                    qty: increment(Number(extra))
+                });
+                alert("Stock actualizado con éxito");
+                loadInventory();
+            } catch(e) { alert("Error al actualizar stock"); }
+        };
+
         window.addToInventory = async () => {
             const name = document.getElementById('inv-name').value;
             const qty = document.getElementById('inv-qty').value;
             const price = document.getElementById('inv-price').value;
             if(!name || !qty || !price) return alert("Completa los datos");
-
             await addDoc(collection(db, "inventory"), {
                 userId: window.currentUser,
                 name: name.toUpperCase(),
@@ -389,6 +398,7 @@
             list.innerHTML = '';
             querySnapshot.forEach((docSnap) => {
                 const inv = docSnap.data();
+                const id = docSnap.id;
                 list.innerHTML += `
                     <div class="bg-slate-50 p-4 rounded-2xl border flex justify-between items-center">
                         <div>
@@ -396,24 +406,101 @@
                             <p class="text-[10px] text-slate-400 font-bold uppercase">${inv.fecha}</p>
                             <p class="text-blue-600 font-black text-xs">$ ${Number(inv.total).toFixed(2)}</p>
                         </div>
-                        <button onclick='alert("Función Visualizar en desarrollo...")' class="bg-slate-800 text-white p-2 rounded-xl">👁️</button>
+                        <div class="flex gap-2">
+                             <button onclick="visualizarFactura('${id}')" class="bg-slate-800 text-white p-2 rounded-xl">👁️</button>
+                             <button onclick="editarFactura('${id}')" class="bg-blue-100 text-blue-600 p-2 rounded-xl">✏️</button>
+                             <button onclick="eliminarFactura('${id}')" class="bg-red-50 text-red-600 p-2 rounded-xl">✕</button>
+                        </div>
                     </div>
                 `;
             });
         }
         window.loadHistory = loadHistory;
 
+        window.editarFactura = async (id) => {
+            const docSnap = await getDoc(doc(db, "invoices", id));
+            if (docSnap.exists()) {
+                const inv = docSnap.data();
+                nuevaFactura(true);
+                window.currentEditingInvoiceId = id; 
+                
+                document.getElementById('display-client-name').innerText = inv.cliente.nombre;
+                document.getElementById('display-client-id-text').innerText = inv.cliente.id;
+                document.getElementById('in-client-id').value = inv.cliente.id;
+                document.getElementById('in-client-name').value = inv.cliente.nombre;
+                document.getElementById('in-client-dir').value = inv.cliente.direccion;
+                document.getElementById('mo-m2').value = inv.manoObra.metros;
+                document.getElementById('mo-price').value = inv.manoObra.precioPorMetro;
+                document.getElementById('tasa-cambio').value = inv.tasa;
+                
+                inv.materiales.forEach(m => {
+                    const rowId = Date.now() + Math.random();
+                    crearFilaMaterial(rowId, m.nombre, m.precio, m.cantidad, !!m.inventoryId, m.inventoryId);
+                });
+                closeModal('modalHistory');
+                saveAndCalc();
+            }
+        };
+
+        window.eliminarFactura = async (id) => {
+            if(confirm("¿Eliminar factura del historial?")) {
+                await deleteDoc(doc(db, "invoices", id));
+                loadHistory();
+            }
+        };
+
+        window.visualizarFactura = async (id) => {
+            const docRef = doc(db, "invoices", id);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const btn = event.currentTarget;
+                const originalText = btn.innerText;
+                btn.innerText = "⏳";
+                
+                fetch('/generar-presupuesto', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(res => res.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Presupuesto_${data.cliente.nombre.replace(/\s+/g, '_')}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    btn.innerText = originalText;
+                })
+                .catch(err => {
+                    alert("Error al descargar PDF");
+                    btn.innerText = originalText;
+                });
+            }
+        };
+
         window.guardarFacturaFirebase = async () => {
             const data = prepararDatos();
             if(!data.cliente.nombre || data.cliente.nombre === "Añadir datos del cliente") return alert("Asigna un nombre al cliente");
             
             try {
-                await addDoc(collection(db, "invoices"), {
-                    ...data,
-                    userId: window.currentUser,
-                    fecha: new Date().toLocaleDateString()
-                });
-                alert("Factura guardada con éxito");
+                if(window.currentEditingInvoiceId) {
+                    await setDoc(doc(db, "invoices", window.currentEditingInvoiceId), {
+                        ...data,
+                        userId: window.currentUser,
+                        fecha: new Date().toLocaleDateString() + " (Editado)"
+                    }, { merge: true });
+                    alert("Cambios guardados en factura");
+                } else {
+                    await addDoc(collection(db, "invoices"), {
+                        ...data,
+                        userId: window.currentUser,
+                        fecha: new Date().toLocaleDateString()
+                    });
+                    alert("Factura guardada con éxito");
+                }
                 loadHistory();
             } catch(e) { alert("Error al guardar en la nube"); }
         }
@@ -433,135 +520,172 @@
                 }
             });
         }
+
+        window.addFromInventory = async (invId, name, price, stockActual) => {
+            const cant = prompt(`Cantidad de ${name} (Stock: ${stockActual}):`, "1");
+            if(!cant || isNaN(cant) || cant <= 0) return;
+            if(Number(cant) > stockActual) return alert("No hay stock suficiente");
+
+            try {
+                await updateDoc(doc(db, "inventory", invId), {
+                    qty: increment(-Number(cant))
+                });
+                
+                const rowId = Date.now();
+                crearFilaMaterial(rowId, name, price, cant, true, invId);
+                loadInventory();
+                closeModal('modalInventory');
+                saveAndCalc();
+            } catch (e) { alert("Error al descontar stock"); }
+        };
+
+        window.removeRow = async (id, isInventory, invId, qty) => {
+            if(isInventory && invId) {
+                const inputQty = document.querySelector(`#row-${id} .item-qty`);
+                const cantParaDevolver = inputQty ? inputQty.value : qty;
+                await updateDoc(doc(db, "inventory", invId), {
+                    qty: increment(Number(cantParaDevolver))
+                });
+                loadInventory();
+            }
+            document.getElementById(`row-${id}`).remove();
+            saveAndCalc();
+        };
+
+        function crearFilaMaterial(id, name, price, qty, isInv, invId = null) {
+            const container = document.getElementById('items-container');
+            const div = document.createElement('div');
+            div.id = `row-${id}`;
+            div.className = `${isInv ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-100'} p-4 rounded-2xl shadow-sm border flex gap-3 items-center animate-slide-up`;
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input type="text" value="${name}" class="w-full text-[10px] font-black uppercase outline-none mb-1 item-name" ${isInv ? 'readonly' : ''}>
+                    <div class="flex gap-2">
+                        <input type="number" value="${qty}" placeholder="CANT" oninput="saveAndCalc()" class="w-16 p-1 ${isInv ? 'bg-white' : 'bg-slate-50'} rounded font-bold text-xs item-qty">
+                        <input type="number" value="${price}" placeholder="PRECIO $" oninput="saveAndCalc()" class="w-24 p-1 ${isInv ? 'bg-white' : 'bg-slate-50'} rounded font-bold text-xs item-price">
+                    </div>
+                    ${isInv ? `<input type="hidden" class="inv-id" value="${invId}">` : ''}
+                </div>
+                <button onclick="removeRow('${id}', ${isInv}, '${invId}', ${qty})" class="text-red-400">✕</button>
+            `;
+            container.appendChild(div);
+        }
+        window.crearFilaMaterial = crearFilaMaterial;
     </script>
 
     <script>
-        // LÓGICA DE LA CALCULADORA (SIN CAMBIOS ESTRUCTURALES)
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
         function addItemRow(tipo) {
-            const container = document.getElementById('items-container');
             const id = Date.now();
-            const div = document.createElement('div');
-            div.id = `row-${id}`;
-            div.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-3 items-center animate-slide-up";
-            
-            div.innerHTML = `
-                <div class="flex-1">
-                    <input type="text" placeholder="NOMBRE DEL MATERIAL" class="w-full text-[10px] font-black uppercase outline-none mb-1 item-name">
-                    <div class="flex gap-2">
-                        <input type="number" placeholder="CANT" oninput="saveAndCalc()" class="w-16 p-1 bg-slate-50 rounded font-bold text-xs item-qty">
-                        <input type="number" placeholder="PRECIO $" oninput="saveAndCalc()" class="w-24 p-1 bg-slate-50 rounded font-bold text-xs item-price">
-                    </div>
-                </div>
-                <button onclick="removeRow('${id}')" class="text-red-400">✕</button>
-            `;
-            container.appendChild(div);
+            window.crearFilaMaterial(id, "", "", "", false);
         }
 
-        function addFromInventory(name, price) {
-            const container = document.getElementById('items-container');
-            const id = Date.now();
-            const div = document.createElement('div');
-            div.id = `row-${id}`;
-            div.className = "bg-blue-50 p-4 rounded-2xl shadow-sm border border-blue-100 flex gap-3 items-center animate-slide-up";
-            div.innerHTML = `
-                <div class="flex-1">
-                    <input type="text" value="${name}" class="w-full text-[10px] font-black uppercase outline-none mb-1 item-name" readonly>
-                    <div class="flex gap-2">
-                        <input type="number" placeholder="CANT" oninput="saveAndCalc()" class="w-16 p-1 bg-white rounded font-bold text-xs item-qty">
-                        <input type="number" value="${price}" oninput="saveAndCalc()" class="w-24 p-1 bg-white rounded font-bold text-xs item-price">
-                    </div>
-                </div>
-                <button onclick="removeRow('${id}')" class="text-red-400">✕</button>
-            `;
-            container.appendChild(div);
-            closeModal('modalInventory');
-            saveAndCalc();
+        function saveClientData() {
+            const id = document.getElementById('in-client-id').value;
+            const name = document.getElementById('in-client-name').value;
+            if(!name) return alert("Mínimo nombre de cliente");
+            document.getElementById('display-client-name').innerText = name;
+            document.getElementById('display-client-id-text').innerText = id;
+            closeModal('modalClient');
         }
 
-        function removeRow(id) {
-            document.getElementById(`row-${id}`).remove();
+        function nuevaFactura(isEdit = false) {
+            if(!isEdit && !confirm("¿Nueva factura? Se borrarán los datos actuales.")) return;
+            document.getElementById('items-container').innerHTML = '';
+            document.getElementById('mo-m2').value = '';
+            document.getElementById('mo-price').value = '';
+            document.getElementById('display-client-name').innerText = "Añadir datos del cliente";
+            document.getElementById('display-client-id-text').innerText = "";
+            document.getElementById('in-client-id').value = "";
+            document.getElementById('in-client-name').value = "";
+            document.getElementById('in-client-dir').value = "";
+            window.currentEditingInvoiceId = null;
             saveAndCalc();
         }
 
         function prepararDatos() {
             const mats = [];
             document.querySelectorAll('#items-container > div').forEach(row => {
+                const invIdInput = row.querySelector('.inv-id');
                 mats.push({
                     nombre: row.querySelector('.item-name').value,
-                    cantidad: row.querySelector('.item-qty').value,
-                    precio: row.querySelector('.item-price').value
+                    cantidad: parseFloat(row.querySelector('.item-qty').value) || 0,
+                    precio: parseFloat(row.querySelector('.item-price').value) || 0,
+                    inventoryId: invIdInput ? invIdInput.value : null
                 });
             });
+
+            const totalText = document.getElementById('total-amount').innerText.replace('$ ', '');
+            const total = parseFloat(totalText) || 0;
 
             return {
                 cliente: {
                     nombre: document.getElementById('display-client-name').innerText,
                     id: document.getElementById('display-client-id-text').innerText,
+                    direccion: document.getElementById('in-client-dir').value
                 },
                 materiales: mats,
                 manoObra: {
-                    metros: document.getElementById('mo-m2').value,
-                    precioPorMetro: document.getElementById('mo-price').value
+                    metros: parseFloat(document.getElementById('mo-m2').value) || 0,
+                    precioPorMetro: parseFloat(document.getElementById('mo-price').value) || 0
                 },
-                tasa: document.getElementById('tasa-cambio').value,
-                total: parseFloat(document.getElementById('total-amount').innerText.replace('$ ', '')) || 0,
-                empresa: {
-                    nombre: document.getElementById('display-company').innerText,
-                    logo: document.getElementById('logo-img').src
-                }
+                tasa: parseFloat(document.getElementById('tasa-cambio').value) || 1,
+                total: total,
+                empresa: document.getElementById('display-company').innerText,
+                logo: document.getElementById('logo-img').src
             };
         }
 
         function saveAndCalc() {
-            const data = prepararDatos();
-            let subtotalMats = 0;
-            data.materiales.forEach(m => {
-                subtotalMats += (Number(m.cantidad) * Number(m.precio));
+            let totalMateriales = 0;
+            document.querySelectorAll('#items-container > div').forEach(row => {
+                const q = parseFloat(row.querySelector('.item-qty').value) || 0;
+                const p = parseFloat(row.querySelector('.item-price').value) || 0;
+                totalMateriales += (q * p);
             });
-            const totalMO = Number(data.manoObra.metros) * Number(data.manoObra.precioPorMetro);
-            const totalUSD = subtotalMats + totalMO;
-            const tasa = Number(data.tasa) || 1;
 
-            document.getElementById('total-amount').innerText = `$ ${totalUSD.toFixed(2)}`;
-            document.getElementById('total-converted').innerText = `BS ${(totalUSD * tasa).toFixed(2)}`;
+            const m2 = parseFloat(document.getElementById('mo-m2').value) || 0;
+            const moPrice = parseFloat(document.getElementById('mo-price').value) || 0;
+            const totalMO = m2 * moPrice;
+
+            const granTotal = totalMateriales + totalMO;
+            const tasa = parseFloat(document.getElementById('tasa-cambio').value) || 1;
+
+            document.getElementById('total-amount').innerText = `$ ${granTotal.toFixed(2)}`;
+            document.getElementById('total-converted').innerText = `BS ${(granTotal * tasa).toFixed(2)}`;
         }
 
         function enviarAlServidor() {
             const data = prepararDatos();
+            const btn = document.getElementById('btn-generate-pdf');
+            btn.disabled = true;
+            btn.innerText = "GENERANDO...";
+
             fetch('/generar-presupuesto', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
-            .then(res => res.text())
-            .then(html => {
-                const win = window.open('', '_blank');
-                win.document.write(html);
-                win.document.close();
+            .then(res => res.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Presupuesto_${data.cliente.nombre.replace(/\s+/g, '_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                btn.disabled = false;
+                btn.innerHTML = "<span>📥</span> PDF";
+            })
+            .catch(err => {
+                alert("Error conectando con el servidor");
+                btn.disabled = false;
+                btn.innerHTML = "<span>📥</span> PDF";
             });
         }
-
-        function saveClientData() {
-            const id = document.getElementById('in-client-id').value;
-            const name = document.getElementById('in-client-name').value;
-            document.getElementById('display-client-name').innerText = name || "Añadir datos del cliente";
-            document.getElementById('display-client-id-text').innerText = id ? `ID: ${id}` : "";
-            closeModal('modalClient');
-        }
-
-        function nuevaFactura() {
-            if(confirm("¿Limpiar todo para una nueva factura?")) {
-                document.getElementById('items-container').innerHTML = '';
-                document.getElementById('mo-m2').value = '';
-                document.getElementById('mo-price').value = '';
-                document.getElementById('display-client-name').innerText = "Añadir datos del cliente";
-                document.getElementById('display-client-id-text').innerText = "";
-                saveAndCalc();
-            }
-        }
-
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
     </script>
 </body>
 </html>
