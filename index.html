@@ -38,7 +38,6 @@
             opacity: 0.7;
             cursor: not-allowed;
         }
-        /* Estilo para impresión básica */
         @media print {
             .no-print { display: none !important; }
         }
@@ -121,8 +120,7 @@
             </button>
 
             <h3 class="text-[10px] font-black text-slate-400 uppercase mb-3 ml-2">Lista de Materiales</h3>
-            <div id="items-container" class="space-y-3">
-                </div>
+            <div id="items-container" class="space-y-3"></div>
 
             <div class="grid grid-cols-2 gap-3 mt-4">
                 <button onclick="addItemRow('externo')" class="py-4 bg-white border-2 border-slate-300 border-dashed rounded-2xl text-slate-600 font-bold text-[10px] uppercase hover:bg-slate-50 active:scale-95 transition-all flex flex-col items-center gap-1">
@@ -243,7 +241,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, enableIndexedDbPersistence, collection, addDoc, getDocs, query, where, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -263,8 +261,60 @@
 
         window.db = db;
         window.auth = auth;
-        window.signIn = signInWithEmailAndPassword;
-        window.logout = signOut;
+
+        // --- FUNCIONES GLOBALES (ACCESIBLES DESDE EL HTML) ---
+
+        window.handleLogin = async () => {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            const btn = document.getElementById('btn-login');
+            
+            btn.disabled = true;
+            btn.innerText = "Verificando...";
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (e) {
+                alert("Error de acceso: Credenciales inválidas");
+                btn.disabled = false;
+                btn.innerText = "Entrar al Sistema";
+            }
+        };
+
+        window.handleLogout = () => {
+            if(confirm("¿Cerrar sesión?")) signOut(auth);
+        };
+
+        window.saveSettings = async () => {
+            const nombre = document.getElementById('in-comp-name').value;
+            const logo = document.getElementById('logo-img').src;
+            
+            try {
+                // Guardamos en un documento único por usuario
+                await setDoc(doc(db, "settings", window.currentUser), {
+                    userId: window.currentUser,
+                    nombre: nombre,
+                    logo: logo
+                });
+                alert("Configuración guardada");
+                location.reload();
+            } catch (e) {
+                alert("Error al guardar ajustes");
+            }
+        };
+
+        window.previewLogo = (input) => {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.getElementById('logo-img');
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                    document.getElementById('logo-txt').classList.add('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        };
 
         onAuthStateChanged(auth, (user) => {
             const authScreen = document.getElementById('auth-screen');
@@ -282,189 +332,236 @@
                 mainApp.classList.remove('hidden');
                 document.getElementById('display-date').innerText = new Date().toLocaleDateString();
                 
-                if(window.loadSettings) window.loadSettings();
-                if(window.loadInventory) window.loadInventory();
-                if(window.loadDraft) window.loadDraft(); // Carga borrador al iniciar
+                loadSettings();
+                loadInventory();
+                loadHistory(); 
             } else {
                 window.currentUser = null;
                 authScreen.classList.remove('hidden');
                 mainApp.classList.add('hidden');
             }
         });
-    </script>
 
-    <script src="app.js"></script>
-
-    <script>
-        // Eliminada la declaración redundante de API_URL ya que se encuentra en app.js
-
-        // SISTEMA KEEP-ALIVE (Mejora para Render)
-        function keepAlive() {
-            if (window.API_URL) {
-                fetch(`${window.API_URL}/ping`)
-                    .then(() => console.log('Keep-alive: Servidor despierto'))
-                    .catch(() => console.log('Keep-alive: Servidor iniciando...'));
-            }
+        async function loadInventory() {
+            if(!window.currentUser) return;
+            const q = query(collection(db, "inventory"), where("userId", "==", window.currentUser));
+            const querySnapshot = await getDocs(q);
+            const list = document.getElementById('inventory-list');
+            list.innerHTML = '';
+            querySnapshot.forEach((doc) => {
+                const item = doc.data();
+                list.innerHTML += `
+                    <div class="bg-slate-50 p-3 rounded-xl border flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-xs uppercase">${item.name}</p>
+                            <p class="text-[10px] text-slate-400">STOCK: ${item.qty} | $${item.price}</p>
+                        </div>
+                        <button onclick="addFromInventory('${item.name}', ${item.price})" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold uppercase">Añadir</button>
+                    </div>
+                `;
+            });
         }
-        setInterval(keepAlive, 300000); // Ping cada 5 minutos
+        window.loadInventory = loadInventory;
 
-        function openModal(id) { 
-            const modal = document.getElementById(id);
-            if(modal) modal.classList.remove('hidden'); 
-        }
-        function closeModal(id) { 
-            const modal = document.getElementById(id);
-            if(modal) modal.classList.add('hidden'); 
-        }
+        window.addToInventory = async () => {
+            const name = document.getElementById('inv-name').value;
+            const qty = document.getElementById('inv-qty').value;
+            const price = document.getElementById('inv-price').value;
+            if(!name || !qty || !price) return alert("Completa los datos");
 
-        // Mejora: Sistema de persistencia local (Draft)
-        function saveAndCalc() {
-            calcTotal();
-            const draft = {
-                m2: document.getElementById('mo-m2').value,
-                moPrice: document.getElementById('mo-price').value,
-                tasa: document.getElementById('tasa-cambio').value,
-                cliente: {
-                    name: document.getElementById('display-client-name').innerText,
-                    id: document.getElementById('in-client-id').value,
-                    dir: document.getElementById('in-client-dir').value
-                }
-            };
-            localStorage.setItem('presupro_draft', JSON.stringify(draft));
-        }
-
-        window.loadDraft = function() {
-            const saved = localStorage.getItem('presupro_draft');
-            if(saved) {
-                const data = JSON.parse(saved);
-                document.getElementById('mo-m2').value = data.m2 || '';
-                document.getElementById('mo-price').value = data.moPrice || '';
-                document.getElementById('tasa-cambio').value = data.tasa || '60';
-                if(data.cliente) {
-                    document.getElementById('display-client-name').innerText = data.cliente.name;
-                    document.getElementById('in-client-id').value = data.cliente.id;
-                    document.getElementById('in-client-dir').value = data.cliente.dir;
-                }
-                calcTotal();
-            }
+            await addDoc(collection(db, "inventory"), {
+                userId: window.currentUser,
+                name: name.toUpperCase(),
+                qty: Number(qty),
+                price: Number(price)
+            });
+            loadInventory();
+            document.getElementById('inv-name').value = '';
+            document.getElementById('inv-qty').value = '';
+            document.getElementById('inv-price').value = '';
         };
 
-        function calcTotal() {
-            let totalMat = 0;
-            document.querySelectorAll('.subtotal-item').forEach(el => {
-                const val = parseFloat(el.innerText.replace('$ ', '').replace(',', '.')) || 0;
-                totalMat += val;
+        async function loadHistory() {
+            if(!window.currentUser) return;
+            const q = query(collection(db, "invoices"), where("userId", "==", window.currentUser));
+            const querySnapshot = await getDocs(q);
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            querySnapshot.forEach((docSnap) => {
+                const inv = docSnap.data();
+                list.innerHTML += `
+                    <div class="bg-slate-50 p-4 rounded-2xl border flex justify-between items-center">
+                        <div>
+                            <p class="font-black text-sm uppercase">${inv.cliente.nombre || 'Sin Nombre'}</p>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase">${inv.fecha}</p>
+                            <p class="text-blue-600 font-black text-xs">$ ${Number(inv.total).toFixed(2)}</p>
+                        </div>
+                        <button onclick='alert("Función Visualizar en desarrollo...")' class="bg-slate-800 text-white p-2 rounded-xl">👁️</button>
+                    </div>
+                `;
             });
+        }
+        window.loadHistory = loadHistory;
+
+        window.guardarFacturaFirebase = async () => {
+            const data = prepararDatos();
+            if(!data.cliente.nombre || data.cliente.nombre === "Añadir datos del cliente") return alert("Asigna un nombre al cliente");
             
-            const m2 = parseFloat(document.getElementById('mo-m2').value) || 0;
-            const p2 = parseFloat(document.getElementById('mo-price').value) || 0;
-            const totalMO = m2 * p2;
-            const tasa = parseFloat(document.getElementById('tasa-cambio').value) || 1;
-            
-            const totalG = totalMat + totalMO;
-            document.getElementById('total-amount').innerText = `$ ${totalG.toFixed(2)}`;
-            document.getElementById('total-converted').innerText = `BS ${(totalG * tasa).toFixed(2)}`;
-            
-            return { totalGeneral: totalG, totalMO: totalMO, tasa: tasa };
+            try {
+                await addDoc(collection(db, "invoices"), {
+                    ...data,
+                    userId: window.currentUser,
+                    fecha: new Date().toLocaleDateString()
+                });
+                alert("Factura guardada con éxito");
+                loadHistory();
+            } catch(e) { alert("Error al guardar en la nube"); }
         }
 
-        async function enviarAlServidor() {
-            const btn = document.getElementById('btn-generate-pdf');
-            const originalText = btn.innerHTML;
-            
-            btn.disabled = true;
-            btn.innerText = "PROCESANDO...";
-
-            const materiales = [];
-            document.querySelectorAll('.material-row').forEach(row => {
-                const nombre = row.querySelector('.nombre-material').value;
-                if(nombre) {
-                    materiales.push({
-                        nombre: nombre,
-                        cantidad: row.querySelector('.cantidad-material').value,
-                        precio: row.querySelector('.precio-material').value,
-                        subtotal: parseFloat(row.querySelector('.subtotal-item').innerText.replace('$ ','').replace(',','.'))
-                    });
+        async function loadSettings() {
+            const q = query(collection(db, "settings"), where("userId", "==", window.currentUser));
+            const snap = await getDocs(q);
+            snap.forEach(doc => {
+                const s = doc.data();
+                document.getElementById('display-company').innerText = s.nombre;
+                document.getElementById('in-comp-name').value = s.nombre;
+                if(s.logo) {
+                    const img = document.getElementById('logo-img');
+                    img.src = s.logo;
+                    img.classList.remove('hidden');
+                    document.getElementById('logo-txt').classList.add('hidden');
                 }
             });
+        }
+    </script>
 
-            const totales = calcTotal();
-            const payload = {
+    <script>
+        // LÓGICA DE LA CALCULADORA (SIN CAMBIOS ESTRUCTURALES)
+        function addItemRow(tipo) {
+            const container = document.getElementById('items-container');
+            const id = Date.now();
+            const div = document.createElement('div');
+            div.id = `row-${id}`;
+            div.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-3 items-center animate-slide-up";
+            
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input type="text" placeholder="NOMBRE DEL MATERIAL" class="w-full text-[10px] font-black uppercase outline-none mb-1 item-name">
+                    <div class="flex gap-2">
+                        <input type="number" placeholder="CANT" oninput="saveAndCalc()" class="w-16 p-1 bg-slate-50 rounded font-bold text-xs item-qty">
+                        <input type="number" placeholder="PRECIO $" oninput="saveAndCalc()" class="w-24 p-1 bg-slate-50 rounded font-bold text-xs item-price">
+                    </div>
+                </div>
+                <button onclick="removeRow('${id}')" class="text-red-400">✕</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function addFromInventory(name, price) {
+            const container = document.getElementById('items-container');
+            const id = Date.now();
+            const div = document.createElement('div');
+            div.id = `row-${id}`;
+            div.className = "bg-blue-50 p-4 rounded-2xl shadow-sm border border-blue-100 flex gap-3 items-center animate-slide-up";
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input type="text" value="${name}" class="w-full text-[10px] font-black uppercase outline-none mb-1 item-name" readonly>
+                    <div class="flex gap-2">
+                        <input type="number" placeholder="CANT" oninput="saveAndCalc()" class="w-16 p-1 bg-white rounded font-bold text-xs item-qty">
+                        <input type="number" value="${price}" oninput="saveAndCalc()" class="w-24 p-1 bg-white rounded font-bold text-xs item-price">
+                    </div>
+                </div>
+                <button onclick="removeRow('${id}')" class="text-red-400">✕</button>
+            `;
+            container.appendChild(div);
+            closeModal('modalInventory');
+            saveAndCalc();
+        }
+
+        function removeRow(id) {
+            document.getElementById(`row-${id}`).remove();
+            saveAndCalc();
+        }
+
+        function prepararDatos() {
+            const mats = [];
+            document.querySelectorAll('#items-container > div').forEach(row => {
+                mats.push({
+                    nombre: row.querySelector('.item-name').value,
+                    cantidad: row.querySelector('.item-qty').value,
+                    precio: row.querySelector('.item-price').value
+                });
+            });
+
+            return {
                 cliente: {
                     nombre: document.getElementById('display-client-name').innerText,
-                    id: document.getElementById('in-client-id').value,
-                    direccion: document.getElementById('in-client-dir').value
+                    id: document.getElementById('display-client-id-text').innerText,
                 },
+                materiales: mats,
+                manoObra: {
+                    metros: document.getElementById('mo-m2').value,
+                    precioPorMetro: document.getElementById('mo-price').value
+                },
+                tasa: document.getElementById('tasa-cambio').value,
+                total: parseFloat(document.getElementById('total-amount').innerText.replace('$ ', '')) || 0,
                 empresa: {
                     nombre: document.getElementById('display-company').innerText,
                     logo: document.getElementById('logo-img').src
-                },
-                materiales: materiales,
-                manoObra: {
-                    metros: document.getElementById('mo-m2').value,
-                    precioPorMetro: document.getElementById('mo-price').value,
-                    totalMO: totales.totalMO
-                },
-                totalGeneral: totales.totalGeneral,
-                tasa: totales.tasa
+                }
             };
+        }
 
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000);
+        function saveAndCalc() {
+            const data = prepararDatos();
+            let subtotalMats = 0;
+            data.materiales.forEach(m => {
+                subtotalMats += (Number(m.cantidad) * Number(m.precio));
+            });
+            const totalMO = Number(data.manoObra.metros) * Number(data.manoObra.precioPorMetro);
+            const totalUSD = subtotalMats + totalMO;
+            const tasa = Number(data.tasa) || 1;
 
-                const res = await fetch(`${window.API_URL}/generar-presupuesto`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if(!res.ok) throw new Error("Fallo en servidor");
+            document.getElementById('total-amount').innerText = `$ ${totalUSD.toFixed(2)}`;
+            document.getElementById('total-converted').innerText = `BS ${(totalUSD * tasa).toFixed(2)}`;
+        }
 
-                const html = await res.text();
+        function enviarAlServidor() {
+            const data = prepararDatos();
+            fetch('/generar-presupuesto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.text())
+            .then(html => {
                 const win = window.open('', '_blank');
                 win.document.write(html);
                 win.document.close();
-            } catch (e) {
-                alert("Error: Render está despertando o la conexión es lenta. Reintenta en 10 segundos.");
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
+            });
+        }
+
+        function saveClientData() {
+            const id = document.getElementById('in-client-id').value;
+            const name = document.getElementById('in-client-name').value;
+            document.getElementById('display-client-name').innerText = name || "Añadir datos del cliente";
+            document.getElementById('display-client-id-text').innerText = id ? `ID: ${id}` : "";
+            closeModal('modalClient');
+        }
+
+        function nuevaFactura() {
+            if(confirm("¿Limpiar todo para una nueva factura?")) {
+                document.getElementById('items-container').innerHTML = '';
+                document.getElementById('mo-m2').value = '';
+                document.getElementById('mo-price').value = '';
+                document.getElementById('display-client-name').innerText = "Añadir datos del cliente";
+                document.getElementById('display-client-id-text').innerText = "";
+                saveAndCalc();
             }
         }
 
-        async function handleLogin() {
-            const email = document.getElementById('auth-email').value;
-            const pass = document.getElementById('auth-pass').value;
-            const btn = document.getElementById('btn-login');
-            
-            btn.disabled = true;
-            btn.innerText = "AUTENTICANDO...";
-            
-            try {
-                await window.signIn(window.auth, email, pass);
-            } catch (e) { 
-                alert("Acceso denegado. Verifica correo y contraseña."); 
-                btn.disabled = false;
-                btn.innerText = "ENTRAR AL SISTEMA";
-            }
-        }
-
-        function handleLogout() { 
-            if(confirm("¿Seguro que deseas cerrar la sesión?")) {
-                localStorage.removeItem('presupro_draft'); // Limpia borrador al salir
-                window.logout(window.auth);
-            }
-        }
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log("SW Activo v4"))
-                .catch(err => console.log("Error SW:", err));
-        }
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
     </script>
 </body>
 </html>

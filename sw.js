@@ -1,4 +1,4 @@
-const CACHE_NAME = 'presupro-v4'; // MEJORA: Incrementamos a v4 para forzar actualización en Render/APK
+const CACHE_NAME = 'presupro-v5'; // MEJORA: Incrementamos a v5 para asegurar la propagación de cambios
 const urlsToCache = [
     '/',
     '/index.html',
@@ -15,21 +15,20 @@ const urlsToCache = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('Caché v4 abierto correctamente');
-            // MEJORA: Intentamos cachear todo, pero no bloqueamos si uno falla
-            // Usamos un mapeo para intentar cachear cada recurso individualmente
+            console.log('Caché v5 abierto correctamente');
             return Promise.all(
                 urlsToCache.map(url => {
-                    return cache.add(url).catch(err => console.warn(`Fallo al cachear: ${url}`, err));
+                    // MEJORA: Añadimos cache-busting interno para la instalación inicial
+                    const request = new Request(url, { cache: 'reload' });
+                    return cache.add(request).catch(err => console.warn(`Fallo al cachear: ${url}`, err));
                 })
             );
         })
     );
-    // Fuerza al SW a activarse inmediatamente
     self.skipWaiting();
 });
 
-// Activación: Limpia cachés antiguos de versiones previas
+// Activación: Limpia cachés antiguos
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
@@ -48,23 +47,19 @@ self.addEventListener('activate', (event) => {
 
 // Estrategia: Network First con fallback a Caché
 self.addEventListener('fetch', (event) => {
-    // Solo manejar peticiones GET
     if (event.request.method !== 'GET') return;
 
-    // Evitar cachear llamadas externas de Firebase o analíticas
     if (event.request.url.includes('firestore.googleapis.com') || 
         event.request.url.includes('firebaseio.com') || 
         event.request.url.includes('googleapis.com/identitytoolkit')) return;
     
-    // MEJORA: Evitar peticiones de extensiones de navegador (chrome-extension://) que rompen el caché
     if (!event.request.url.startsWith('http')) return;
 
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                // MEJORA: Si la respuesta es buena, guardamos una copia en el caché
-                // Las respuestas de CDNs (Tailwind/Fonts) pueden ser 'opaque', las manejamos con cuidado
-                if (response && response.status === 200) {
+                // MEJORA: Validación de respuesta básica para evitar cachear errores opacos
+                if (response && response.status === 200 && response.type === 'basic') {
                     const responseToCache = response.clone();
                     caches.open(CACHE_NAME).then((cache) => {
                         cache.put(event.request, responseToCache);
@@ -73,21 +68,23 @@ self.addEventListener('fetch', (event) => {
                 return response;
             })
             .catch(() => {
-                // Si falla la red (offline), buscamos en el caché
                 return caches.match(event.request).then((res) => {
                     if (res) return res;
-                    
-                    // Si es una navegación (página principal), devolvemos el root cacheado
                     if (event.request.mode === 'navigate' || 
                        (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
                         return caches.match('/');
                     }
-
-                    // MEJORA: Fallback para imágenes fallidas en offline
                     if (event.request.destination === 'image') {
                         return caches.match('/icon-192.png');
                     }
                 });
             })
     );
+});
+
+// MEJORA: Manejo de mensajes para forzar actualización inmediata desde la UI
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
