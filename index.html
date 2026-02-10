@@ -14,6 +14,7 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;900&family=Playfair+Display:wght@700&family=Roboto+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <style>
         body {
@@ -42,9 +43,72 @@
         @media print {
             .no-print { display: none !important; }
         }
+
+        /* Contenedor para la generación de la imagen profesional (Oculto en la interfaz) */
+        #render-invoice {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            width: 800px;
+            background: white;
+            padding: 40px;
+            color: #1e293b;
+            font-family: 'Inter', sans-serif;
+        }
+        .table-pro th { border-bottom: 2px solid #2563eb; padding: 10px; font-size: 12px; text-transform: uppercase; color: #64748b; text-align: left; }
+        .table-pro td { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 overflow-x-hidden antialiased">
+
+    <div id="render-invoice">
+        <div class="flex justify-between items-start mb-8 border-b-4 border-blue-600 pb-6">
+            <div>
+                <img id="pro-logo" src="" class="h-20 object-contain hidden mb-4">
+                <h1 id="pro-company" class="text-3xl font-black text-slate-800 uppercase italic"></h1>
+            </div>
+            <div class="text-right">
+                <h2 class="text-5xl font-black text-slate-100 uppercase tracking-tighter text-blue-600/10">Cotización</h2>
+                <p id="pro-date" class="font-mono text-sm text-slate-500 mt-2"></p>
+            </div>
+        </div>
+        <div class="bg-slate-50 p-6 rounded-3xl mb-8 flex justify-between border border-slate-100">
+            <div>
+                <p class="text-[10px] font-black text-blue-600 uppercase mb-1">Cliente</p>
+                <p id="pro-client-name" class="text-lg font-black uppercase text-slate-800"></p>
+                <p id="pro-client-id" class="text-xs font-bold text-slate-400"></p>
+            </div>
+            <div class="text-right">
+                <p class="text-[10px] font-black text-blue-600 uppercase mb-1">Ubicación</p>
+                <p id="pro-client-dir" class="text-xs font-bold text-slate-500"></p>
+            </div>
+        </div>
+        <table class="w-full table-pro mb-8">
+            <thead>
+                <tr>
+                    <th class="w-16">Cant.</th>
+                    <th>Descripción</th>
+                    <th class="text-right">Unitario</th>
+                    <th class="text-right">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody id="pro-items-body"></tbody>
+        </table>
+        <div id="pro-mo-box" class="mb-8 p-6 bg-blue-50 rounded-3xl border border-blue-100 hidden flex justify-between items-center">
+            <p id="pro-mo-desc" class="text-sm font-bold text-slate-600"></p>
+            <p id="pro-mo-total" class="text-xl font-black text-slate-800"></p>
+        </div>
+        <div class="flex justify-end">
+            <div class="w-80 space-y-3 text-right">
+                <div class="flex justify-between px-4 text-slate-400 font-black uppercase text-xs">
+                    <span>Total USD:</span><span id="pro-total-usd" class="text-slate-800 text-xl font-bold"></span>
+                </div>
+                <div class="bg-slate-900 p-6 rounded-[2rem] text-white flex justify-between items-center">
+                    <span id="pro-total-bs" class="text-3xl font-black w-full text-center"></span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="splash" class="fixed inset-0 bg-blue-600 z-[100] flex items-center justify-center transition-opacity duration-500">
         <div class="text-white text-center">
@@ -56,11 +120,11 @@
     <div id="auth-screen" class="fixed inset-0 bg-slate-900 z-[90] flex items-center justify-center p-6">
         <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
             <div class="text-center mb-8">
-                <div class="text-3xl mb-2">🔐</div>
+                <div class="text-3xl mb-2">🔑</div>
                 <h2 class="text-2xl font-black text-slate-800 uppercase italic leading-none">Acceso<br><span class="text-blue-600">Restringido</span></h2>
                 <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">Ingresa tus credenciales</p>
             </div>
-            <form onsubmit="event.preventDefault(); handleLogin();" class="space-y-4">
+            <form onsubmit="event.preventDefault(); window.handleLogin();" class="space-y-4">
                 <div>
                     <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Correo Electrónico</label>
                     <input type="email" id="auth-email" required class="w-full p-4 bg-slate-100 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm">
@@ -79,19 +143,19 @@
 
     <div id="main-app" class="hidden">
         <nav class="fixed bottom-0 shrink-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center h-16 z-50 no-print">
-            <button onclick="nuevaFactura()" class="flex flex-col items-center text-blue-600">
-                <span class="text-xl">📝</span>
+            <button onclick="window.nuevaFactura()" class="flex flex-col items-center text-blue-600">
+                <span class="text-xl">📄</span>
                 <span class="text-[10px] font-bold uppercase">Nueva</span>
             </button>
-            <button onclick="openModal('modalInventory')" class="flex flex-col items-center text-slate-400">
+            <button onclick="window.openModal('modalInventory')" class="flex flex-col items-center text-slate-400">
                 <span class="text-xl">📦</span>
                 <span class="text-[10px] font-bold uppercase">Inventario</span>
             </button>
-            <button onclick="openModal('modalHistory')" class="flex flex-col items-center text-slate-400">
-                <span class="text-xl">🔍</span>
+            <button onclick="window.openModal('modalHistory')" class="flex flex-col items-center text-slate-400">
+                <span class="text-xl">📋</span>
                 <span class="text-[10px] font-bold uppercase">Historial</span>
             </button>
-            <button onclick="openModal('modalSettings')" class="flex flex-col items-center text-slate-400">
+            <button onclick="window.openModal('modalSettings')" class="flex flex-col items-center text-slate-400">
                 <span class="text-xl">⚙️</span>
                 <span class="text-[10px] font-bold uppercase">Ajustes</span>
             </button>
@@ -111,7 +175,7 @@
                 </div>
             </header>
 
-            <button onclick="openModal('modalClient')" class="w-full bg-white border-2 border-dashed border-slate-200 p-4 rounded-2xl mb-6 flex justify-between items-center active:scale-95 transition-transform">
+            <button onclick="window.openModal('modalClient')" class="w-full bg-white border-2 border-dashed border-slate-200 p-4 rounded-2xl mb-6 flex justify-between items-center active:scale-95 transition-transform">
                 <div class="text-left">
                     <p class="text-[10px] font-bold text-slate-400 uppercase">Cliente:</p>
                     <p id="display-client-name" class="font-bold text-slate-700 uppercase italic text-sm">Añadir datos del cliente</p>
@@ -124,11 +188,11 @@
             <div id="items-container" class="space-y-3"></div>
 
             <div class="grid grid-cols-2 gap-3 mt-4">
-                <button onclick="addItemRow('externo')" class="py-4 bg-white border-2 border-slate-300 border-dashed rounded-2xl text-slate-600 font-bold text-[10px] uppercase hover:bg-slate-50 active:scale-95 transition-all flex flex-col items-center gap-1">
+                <button onclick="window.addItemRow('externo')" class="py-4 bg-white border-2 border-slate-300 border-dashed rounded-2xl text-slate-600 font-bold text-[10px] uppercase hover:bg-slate-50 active:scale-95 transition-all flex flex-col items-center gap-1">
                     <span class="text-lg">🛒</span> Compra Externa
                 </button>
-                <button onclick="openModal('modalInventory')" class="py-4 bg-white border-2 border-blue-600 border-dashed rounded-2xl text-blue-600 font-bold text-[10px] uppercase hover:bg-blue-50 active:scale-95 transition-all flex flex-col items-center gap-1">
-                    <span class="text-lg">📦</span> Mi Inventario
+                <button onclick="window.openModal('modalInventory')" class="py-4 bg-white border-2 border-blue-600 border-dashed rounded-2xl text-blue-600 font-bold text-[10px] uppercase hover:bg-blue-50 active:scale-95 transition-all flex flex-col items-center gap-1">
+                    <span class="text-lg">🏬</span> Mi Inventario
                 </button>
             </div>
 
@@ -137,11 +201,11 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-[9px] font-bold text-slate-400 ml-1">METROS CUADRADOS (m2)</label>
-                        <input type="number" id="mo-m2" oninput="saveAndCalc()" placeholder="0" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="mo-m2" oninput="window.saveAndCalc()" placeholder="0" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="text-[9px] font-bold text-slate-400 ml-1">PRECIO POR m2 ($)</label>
-                        <input type="number" id="mo-price" oninput="saveAndCalc()" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="mo-price" oninput="window.saveAndCalc()" placeholder="0.00" class="w-full p-3 bg-slate-50 rounded-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
             </div>
@@ -154,15 +218,15 @@
                     </div>
                     <div class="text-right">
                         <p class="text-[10px] font-bold text-blue-400 uppercase">Tasa del día</p>
-                        <input type="number" id="tasa-cambio" value="60" oninput="saveAndCalc()" class="bg-transparent text-right font-black text-xl w-20 outline-none border-b border-blue-500/30">
+                        <input type="number" id="tasa-cambio" value="60" oninput="window.saveAndCalc()" class="bg-transparent text-right font-black text-xl w-20 outline-none border-b border-blue-500/30">
                     </div>
                 </div>
                 
                 <div class="grid grid-cols-2 gap-2 mb-4">
-                    <button id="btn-generate-pdf" onclick="enviarAlServidor()" class="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
-                        <span>📥</span> PDF
+                    <button id="btn-generate-pdf" onclick="window.enviarAlServidor()" class="py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                        <span>🖼️</span> IMAGEN
                     </button>
-                    <button id="btn-save-invoice" onclick="guardarFacturaFirebase()" class="py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                    <button id="btn-save-invoice" onclick="window.guardarFacturaFirebase()" class="py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-[10px] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
                         <span>💾</span> GUARDAR
                     </button>
                 </div>
@@ -175,7 +239,7 @@
 
             <footer class="mt-12 text-center pb-10">
                 <p class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">PresuPro v2.0</p>
-                <p class="text-[9px] font-bold text-blue-400/50 uppercase">Conexión con Servidor Render Activa</p>
+                <p class="text-[9px] font-bold text-blue-400/50 uppercase">Conexión Segura Activa</p>
             </footer>
         </main>
     </div>
@@ -187,8 +251,8 @@
                 <input type="text" id="in-client-id" placeholder="Cédula / ID" class="w-full p-4 bg-slate-50 rounded-2xl outline-none border font-bold text-sm">
                 <input type="text" id="in-client-name" placeholder="Nombre Completo" class="w-full p-4 bg-slate-50 rounded-2xl outline-none border font-bold text-sm">
                 <input type="text" id="in-client-dir" placeholder="Dirección" class="w-full p-4 bg-slate-50 rounded-2xl outline-none border font-bold text-sm">
-                <button onclick="saveClientData()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm mt-2">Listo</button>
-                <button onclick="closeModal('modalClient')" class="w-full text-slate-400 font-bold text-[10px] uppercase">Cancelar</button>
+                <button onclick="window.saveClientData()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm mt-2">Listo</button>
+                <button onclick="window.closeModal('modalClient')" class="w-full text-slate-400 font-bold text-[10px] uppercase">Cancelar</button>
             </div>
         </div>
     </div>
@@ -197,7 +261,7 @@
         <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[80vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-black uppercase">Mi Inventario</h3>
-                <button onclick="closeModal('modalInventory')" class="text-2xl">&times;</button>
+                <button onclick="window.closeModal('modalInventory')" class="text-2xl">&times;</button>
             </div>
             <div class="bg-slate-100 p-4 rounded-2xl mb-4 space-y-2">
                 <input type="text" id="inv-name" placeholder="Nombre Producto" class="w-full p-2 rounded-lg text-xs uppercase font-bold outline-none">
@@ -205,7 +269,7 @@
                     <input type="number" id="inv-qty" placeholder="Stock" class="w-1/2 p-2 rounded-lg text-xs outline-none">
                     <input type="number" id="inv-price" placeholder="Precio $" class="w-1/2 p-2 rounded-lg text-xs outline-none">
                 </div>
-                <button id="btn-add-inv" onclick="addToInventory()" class="w-full bg-slate-800 text-white text-[10px] font-bold py-2 rounded-lg uppercase">+ Guardar en Stock</button>
+                <button id="btn-add-inv" onclick="window.addToInventory()" class="w-full bg-slate-800 text-white text-[10px] font-bold py-2 rounded-lg uppercase">+ Guardar en Stock</button>
             </div>
             <div id="inventory-list" class="flex-1 overflow-y-auto space-y-2"></div>
         </div>
@@ -215,7 +279,7 @@
         <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[80vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-black uppercase">Historial de Facturas</h3>
-                <button onclick="closeModal('modalHistory')" class="text-2xl">&times;</button>
+                <button onclick="window.closeModal('modalHistory')" class="text-2xl">&times;</button>
             </div>
             <div id="history-list" class="flex-1 overflow-y-auto space-y-3"></div>
         </div>
@@ -231,11 +295,11 @@
                 </div>
                 <div>
                     <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Logo de Empresa</label>
-                    <input type="file" id="in-comp-logo" onchange="previewLogo(this)" class="w-full text-xs mt-1" accept="image/*">
+                    <input type="file" id="in-comp-logo" onchange="window.previewLogo(this)" class="w-full text-xs mt-1" accept="image/*">
                 </div>
-                <button onclick="saveSettings()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm">Guardar Cambios</button>
-                <button onclick="handleLogout()" class="w-full bg-red-50 text-red-600 font-black py-4 rounded-2xl uppercase text-sm mt-4">Cerrar Sesión</button>
-                <button onclick="closeModal('modalSettings')" class="w-full text-slate-400 font-bold text-[10px] uppercase">Cerrar</button>
+                <button onclick="window.saveSettings()" class="w-full bg-blue-600 text-white font-black py-4 rounded-2xl uppercase text-sm">Guardar Cambios</button>
+                <button onclick="window.handleLogout()" class="w-full bg-red-50 text-red-600 font-black py-4 rounded-2xl uppercase text-sm mt-4">Cerrar Sesión</button>
+                <button onclick="window.closeModal('modalSettings')" class="w-full text-slate-400 font-bold text-[10px] uppercase">Cerrar</button>
             </div>
         </div>
     </div>
@@ -253,7 +317,6 @@
             messagingSenderId: "56089233501",
             appId: "1:56089233501:web:363348f4daf2b6bb9825b4"
         };
-
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
@@ -265,13 +328,19 @@
 
         window.currentEditingInvoiceId = null;
 
+        // GLOBALIZACIÓN DE FUNCIONES (CORRECCIÓN DEL ERROR DE SCOPE)
+        window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
+        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+
         window.handleLogin = async () => {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
             const btn = document.getElementById('btn-login');
             btn.disabled = true;
             btn.innerText = "Verificando...";
-            try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) {
+            try { 
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (e) {
                 alert("Error de acceso: Credenciales inválidas");
                 btn.disabled = false;
                 btn.innerText = "Entrar al Sistema";
@@ -344,9 +413,9 @@
                             <p class="text-[10px] text-slate-400">STOCK: ${item.qty} | $${item.price}</p>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="reponerStock('${id}', '${item.name}')" class="bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase" title="Reponer Stock">📦+</button>
-                            <button onclick="addFromInventory('${id}', '${item.name}', ${item.price}, ${item.qty})" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold uppercase">Añadir</button>
-                            <button onclick="deleteInventoryItem('${id}')" class="text-red-500 text-sm">✕</button>
+                            <button onclick="window.reponerStock('${id}', '${item.name}')" class="bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">➕</button>
+                            <button onclick="window.addFromInventory('${id}', '${item.name}', ${item.price}, ${item.qty})" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold uppercase">Añadir</button>
+                            <button onclick="window.deleteInventoryItem('${id}')" class="text-red-500 text-sm">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -368,7 +437,7 @@
                 await updateDoc(doc(db, "inventory", invId), {
                     qty: increment(Number(extra))
                 });
-                alert("Stock actualizado con éxito");
+                alert("Stock actualizado");
                 loadInventory();
             } catch(e) { alert("Error al actualizar stock"); }
         };
@@ -407,9 +476,9 @@
                             <p class="text-blue-600 font-black text-xs">$ ${Number(inv.total).toFixed(2)}</p>
                         </div>
                         <div class="flex gap-2">
-                             <button onclick="visualizarFactura('${id}')" class="bg-slate-800 text-white p-2 rounded-xl">👁️</button>
-                             <button onclick="editarFactura('${id}')" class="bg-blue-100 text-blue-600 p-2 rounded-xl">✏️</button>
-                             <button onclick="eliminarFactura('${id}')" class="bg-red-50 text-red-600 p-2 rounded-xl">✕</button>
+                             <button onclick="window.visualizarFactura('${id}')" class="bg-slate-800 text-white p-2 rounded-xl">🖼️</button>
+                             <button onclick="window.editarFactura('${id}')" class="bg-blue-100 text-blue-600 p-2 rounded-xl">✏️</button>
+                             <button onclick="window.eliminarFactura('${id}')" class="bg-red-50 text-red-600 p-2 rounded-xl">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -421,7 +490,7 @@
             const docSnap = await getDoc(doc(db, "invoices", id));
             if (docSnap.exists()) {
                 const inv = docSnap.data();
-                nuevaFactura(true);
+                window.nuevaFactura(true);
                 window.currentEditingInvoiceId = id; 
                 
                 document.getElementById('display-client-name').innerText = inv.cliente.nombre;
@@ -435,10 +504,10 @@
                 
                 inv.materiales.forEach(m => {
                     const rowId = Date.now() + Math.random();
-                    crearFilaMaterial(rowId, m.nombre, m.precio, m.cantidad, !!m.inventoryId, m.inventoryId);
+                    window.crearFilaMaterial(rowId, m.nombre, m.precio, m.cantidad, !!m.inventoryId, m.inventoryId);
                 });
-                closeModal('modalHistory');
-                saveAndCalc();
+                window.closeModal('modalHistory');
+                window.saveAndCalc();
             }
         };
 
@@ -450,41 +519,17 @@
         };
 
         window.visualizarFactura = async (id) => {
-            const docRef = doc(db, "invoices", id);
-            const docSnap = await getDoc(docRef);
+            const docSnap = await getDoc(doc(db, "invoices", id));
             if (docSnap.exists()) {
-                const data = docSnap.data();
-                const btn = event.currentTarget;
-                const originalText = btn.innerText;
-                btn.innerText = "⏳";
-                
-                fetch('/generar-presupuesto', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                })
-                .then(res => res.blob())
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `Presupuesto_${data.cliente.nombre.replace(/\s+/g, '_')}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    btn.innerText = originalText;
-                })
-                .catch(err => {
-                    alert("Error al descargar PDF");
-                    btn.innerText = originalText;
-                });
+                const inv = docSnap.data();
+                window.editarFactura(id); // Carga los datos para poder renderizarlos
+                setTimeout(() => window.enviarAlServidor(), 1000);
             }
         };
 
         window.guardarFacturaFirebase = async () => {
-            const data = prepararDatos();
+            const data = window.prepararDatos();
             if(!data.cliente.nombre || data.cliente.nombre === "Añadir datos del cliente") return alert("Asigna un nombre al cliente");
-            
             try {
                 if(window.currentEditingInvoiceId) {
                     await setDoc(doc(db, "invoices", window.currentEditingInvoiceId), {
@@ -525,17 +570,15 @@
             const cant = prompt(`Cantidad de ${name} (Stock: ${stockActual}):`, "1");
             if(!cant || isNaN(cant) || cant <= 0) return;
             if(Number(cant) > stockActual) return alert("No hay stock suficiente");
-
             try {
                 await updateDoc(doc(db, "inventory", invId), {
                     qty: increment(-Number(cant))
                 });
-                
                 const rowId = Date.now();
-                crearFilaMaterial(rowId, name, price, cant, true, invId);
+                window.crearFilaMaterial(rowId, name, price, cant, true, invId);
                 loadInventory();
-                closeModal('modalInventory');
-                saveAndCalc();
+                window.closeModal('modalInventory');
+                window.saveAndCalc();
             } catch (e) { alert("Error al descontar stock"); }
         };
 
@@ -549,10 +592,10 @@
                 loadInventory();
             }
             document.getElementById(`row-${id}`).remove();
-            saveAndCalc();
+            window.saveAndCalc();
         };
 
-        function crearFilaMaterial(id, name, price, qty, isInv, invId = null) {
+        window.crearFilaMaterial = (id, name, price, qty, isInv, invId = null) => {
             const container = document.getElementById('items-container');
             const div = document.createElement('div');
             div.id = `row-${id}`;
@@ -561,37 +604,32 @@
                 <div class="flex-1">
                     <input type="text" value="${name}" class="w-full text-[10px] font-black uppercase outline-none mb-1 item-name" ${isInv ? 'readonly' : ''}>
                     <div class="flex gap-2">
-                        <input type="number" value="${qty}" placeholder="CANT" oninput="saveAndCalc()" class="w-16 p-1 ${isInv ? 'bg-white' : 'bg-slate-50'} rounded font-bold text-xs item-qty">
-                        <input type="number" value="${price}" placeholder="PRECIO $" oninput="saveAndCalc()" class="w-24 p-1 ${isInv ? 'bg-white' : 'bg-slate-50'} rounded font-bold text-xs item-price">
+                        <input type="number" value="${qty}" placeholder="CANT" oninput="window.saveAndCalc()" class="w-16 p-1 ${isInv ? 'bg-white' : 'bg-slate-50'} rounded font-bold text-xs item-qty">
+                        <input type="number" value="${price}" placeholder="PRECIO $" oninput="window.saveAndCalc()" class="w-24 p-1 ${isInv ? 'bg-white' : 'bg-slate-50'} rounded font-bold text-xs item-price">
                     </div>
                     ${isInv ? `<input type="hidden" class="inv-id" value="${invId}">` : ''}
                 </div>
-                <button onclick="removeRow('${id}', ${isInv}, '${invId}', ${qty})" class="text-red-400">✕</button>
+                <button onclick="window.removeRow('${id}', ${isInv}, '${invId}', ${qty})" class="text-red-400">✕</button>
             `;
             container.appendChild(div);
         }
-        window.crearFilaMaterial = crearFilaMaterial;
-    </script>
 
-    <script>
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        function addItemRow(tipo) {
+        // EXPOSICIÓN DE OTRAS FUNCIONES NECESARIAS
+        window.addItemRow = (tipo) => {
             const id = Date.now();
             window.crearFilaMaterial(id, "", "", "", false);
-        }
+        };
 
-        function saveClientData() {
+        window.saveClientData = () => {
             const id = document.getElementById('in-client-id').value;
             const name = document.getElementById('in-client-name').value;
             if(!name) return alert("Mínimo nombre de cliente");
             document.getElementById('display-client-name').innerText = name;
             document.getElementById('display-client-id-text').innerText = id;
-            closeModal('modalClient');
-        }
+            window.closeModal('modalClient');
+        };
 
-        function nuevaFactura(isEdit = false) {
+        window.nuevaFactura = (isEdit = false) => {
             if(!isEdit && !confirm("¿Nueva factura? Se borrarán los datos actuales.")) return;
             document.getElementById('items-container').innerHTML = '';
             document.getElementById('mo-m2').value = '';
@@ -602,10 +640,10 @@
             document.getElementById('in-client-name').value = "";
             document.getElementById('in-client-dir').value = "";
             window.currentEditingInvoiceId = null;
-            saveAndCalc();
-        }
+            window.saveAndCalc();
+        };
 
-        function prepararDatos() {
+        window.prepararDatos = () => {
             const mats = [];
             document.querySelectorAll('#items-container > div').forEach(row => {
                 const invIdInput = row.querySelector('.inv-id');
@@ -616,10 +654,7 @@
                     inventoryId: invIdInput ? invIdInput.value : null
                 });
             });
-
             const totalText = document.getElementById('total-amount').innerText.replace('$ ', '');
-            const total = parseFloat(totalText) || 0;
-
             return {
                 cliente: {
                     nombre: document.getElementById('display-client-name').innerText,
@@ -632,60 +667,75 @@
                     precioPorMetro: parseFloat(document.getElementById('mo-price').value) || 0
                 },
                 tasa: parseFloat(document.getElementById('tasa-cambio').value) || 1,
-                total: total,
+                total: parseFloat(totalText) || 0,
                 empresa: document.getElementById('display-company').innerText,
                 logo: document.getElementById('logo-img').src
             };
-        }
+        };
 
-        function saveAndCalc() {
+        window.saveAndCalc = () => {
             let totalMateriales = 0;
             document.querySelectorAll('#items-container > div').forEach(row => {
                 const q = parseFloat(row.querySelector('.item-qty').value) || 0;
                 const p = parseFloat(row.querySelector('.item-price').value) || 0;
                 totalMateriales += (q * p);
             });
-
             const m2 = parseFloat(document.getElementById('mo-m2').value) || 0;
             const moPrice = parseFloat(document.getElementById('mo-price').value) || 0;
             const totalMO = m2 * moPrice;
-
             const granTotal = totalMateriales + totalMO;
             const tasa = parseFloat(document.getElementById('tasa-cambio').value) || 1;
 
             document.getElementById('total-amount').innerText = `$ ${granTotal.toFixed(2)}`;
             document.getElementById('total-converted').innerText = `BS ${(granTotal * tasa).toFixed(2)}`;
-        }
+        };
 
-        function enviarAlServidor() {
-            const data = prepararDatos();
+        // MEJORA: GENERACIÓN DE IMAGEN LOCAL PARA EVITAR 404
+        window.enviarAlServidor = async () => {
+            const data = window.prepararDatos();
             const btn = document.getElementById('btn-generate-pdf');
             btn.disabled = true;
-            btn.innerText = "GENERANDO...";
+            btn.innerText = "PROCESANDO...";
 
-            fetch('/generar-presupuesto', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(res => res.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Presupuesto_${data.cliente.nombre.replace(/\s+/g, '_')}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                btn.disabled = false;
-                btn.innerHTML = "<span>📥</span> PDF";
-            })
-            .catch(err => {
-                alert("Error conectando con el servidor");
-                btn.disabled = false;
-                btn.innerHTML = "<span>📥</span> PDF";
+            // Llenar plantilla de renderizado
+            document.getElementById('pro-company').innerText = data.empresa;
+            document.getElementById('pro-logo').src = data.logo;
+            if(data.logo) document.getElementById('pro-logo').classList.remove('hidden');
+            document.getElementById('pro-date').innerText = "Fecha: " + new Date().toLocaleDateString();
+            document.getElementById('pro-client-name').innerText = data.cliente.nombre;
+            document.getElementById('pro-client-id').innerText = "ID: " + data.cliente.id;
+            document.getElementById('pro-client-dir').innerText = data.cliente.direccion || "Sin dirección";
+
+            const proBody = document.getElementById('pro-items-body');
+            proBody.innerHTML = '';
+            data.materiales.forEach(m => {
+                if(m.nombre) proBody.innerHTML += `<tr><td>${m.cantidad}</td><td class="font-bold uppercase">${m.nombre}</td><td class="text-right">$${m.precio}</td><td class="text-right font-black">$${(m.cantidad*m.precio).toFixed(2)}</td></tr>`;
             });
-        }
+
+            if(data.manoObra.metros > 0) {
+                document.getElementById('pro-mo-box').classList.remove('hidden');
+                document.getElementById('pro-mo-desc').innerText = `Mano de Obra (${data.manoObra.metros} m2)`;
+                document.getElementById('pro-mo-total').innerText = `$${(data.manoObra.metros*data.manoObra.precioPorMetro).toFixed(2)}`;
+            } else {
+                document.getElementById('pro-mo-box').classList.add('hidden');
+            }
+
+            document.getElementById('pro-total-usd').innerText = `$ ${data.total.toFixed(2)}`;
+            const tasa = parseFloat(document.getElementById('tasa-cambio').value) || 1;
+            document.getElementById('pro-total-bs').innerText = `BS ${(data.total * tasa).toFixed(2)}`;
+
+            // Capturar la imagen
+            setTimeout(() => {
+                html2canvas(document.getElementById('render-invoice'), { scale: 2 }).then(canvas => {
+                    const a = document.createElement('a');
+                    a.download = `Presupuesto_${data.cliente.nombre.replace(/\s+/g, '_')}.jpg`;
+                    a.href = canvas.toDataURL("image/jpeg", 0.9);
+                    a.click();
+                    btn.disabled = false;
+                    btn.innerText = "🖼️ IMAGEN";
+                });
+            }, 500);
+        };
     </script>
 </body>
 </html>
